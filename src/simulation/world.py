@@ -15,7 +15,7 @@ class World:
         self.organisms = []
         self.objects = []
 
-        for _ in range(1000):
+        for _ in range(10):
             organism = OrganismFactory.create_basic()
             self.add_organism(organism)
 

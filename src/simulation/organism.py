@@ -7,7 +7,7 @@ from simulation.object import Object
 
 class Organism(Object):
     def __init__(self, matter: Matter, speed=20, energy=100, color=(0, 255, 0)):
-        super().__init__(matter, color, body_type = pymunk.Body.DYNAMIC)
+        super().__init__(matter, color, body_type = pymunk.Body.KINEMATIC)
 
         self.brain = Brain(self)
         self.speed = speed

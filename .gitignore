@@ -322,3 +322,5 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/pycharm,python,windows
 /.idea/
+
+/.claude/settings.local.json
