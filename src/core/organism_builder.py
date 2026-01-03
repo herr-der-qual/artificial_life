@@ -11,7 +11,8 @@ class OrganismBuilder:
     def __init__(self):
         self.speed = 20
         self.energy = 100
-        self.color = (0, 255, 0) 
+        self.energy_drain_rate = 10
+        self.color = (0, 255, 0)
         self.position = (0, 0)
         self.matter = None
 
@@ -25,6 +26,10 @@ class OrganismBuilder:
 
     def set_energy(self, energy: float):
         self.energy = energy
+        return self
+
+    def set_energy_drain_rate(self, rate: float):
+        self.energy_drain_rate = rate
         return self
 
     def set_color(self, color: tuple):
@@ -43,6 +48,7 @@ class OrganismBuilder:
             color=self.color,
         )
         organism.position = self.position
-        
+        organism.energy_drain_rate = self.energy_drain_rate
+
         return organism
 

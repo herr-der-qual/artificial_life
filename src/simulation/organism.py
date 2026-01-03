@@ -12,8 +12,23 @@ class Organism(Substance):
         self.brain = Brain(self)
         self.speed = speed
         self.energy = energy
-
+        self.max_energy = energy
+        self.is_alive = True
+        self.energy_drain_rate = 10
         self.shape.collision_type = 2
 
-    def update(self):
+    def update(self, delta_time=1/60):
+        if not self.is_alive:
+            return
+
+        self.energy -= self.energy_drain_rate * delta_time
+
+        if self.energy <= 0:
+            self.die()
+            return
+
         self.brain.update()
+
+    def die(self):
+        self.is_alive = False
+        self.energy = 0
