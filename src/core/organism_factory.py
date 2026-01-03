@@ -22,10 +22,8 @@ class OrganismFactory:
     def create_basic():
         builder = OrganismBuilder()
         matter = Matter()
-        matter.add_element(Elements.C)
-        matter.add_element(Elements.C)
-        matter.add_element(Elements.C)
-        
+        matter.add_elements([Elements.C, Elements.C, Elements.C])
+
         return (
             builder.set_position((100, 100))
                 .set_speed(30)

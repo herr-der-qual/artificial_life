@@ -1,11 +1,11 @@
 import pymunk
 
-from simulation.matter import Matter
-from simulation.elements import Elements, Atoms
 from ai.brain import Brain
-from simulation.object import Object
+from simulation.matter import Matter
+from simulation.substance import Substance
 
-class Organism(Object):
+
+class Organism(Substance):
     def __init__(self, matter: Matter, speed=20, energy=100, color=(0, 255, 0)):
         super().__init__(matter, color, body_type = pymunk.Body.KINEMATIC)
 

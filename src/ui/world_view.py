@@ -13,7 +13,7 @@ class WorldView(arcade.View):
         self.camera = Camera()
         self.world = World()
         self.renderer = Renderer()
-        self.renderer.initialize(self.world.organisms + self.world.objects)
+        self.renderer.initialize(self.world.organisms + self.world.substances)
 
         self.runner = SimulationRunner(self.world)
         self.runner.start()
@@ -25,7 +25,7 @@ class WorldView(arcade.View):
         center = arcade.XYWH(-2.5, -2.5, 5, 5)
         arcade.draw_rect_filled(center, (255, 255, 255))
 
-        self.renderer.render(self.world.organisms + self.world.objects)
+        self.renderer.render(self.world.organisms + self.world.substances)
 
     def on_update(self, delta_time):
         self.camera.update()
