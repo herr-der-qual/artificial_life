@@ -53,6 +53,7 @@ class World:
     def add_organism(self, organism):
         self.organisms.append(organism)
         self.space.add(organism, organism.shape)
+        organism.brain.world = self
 
     def add_substance(self, substance):
         self.substances.append(substance)
