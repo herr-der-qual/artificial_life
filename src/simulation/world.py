@@ -3,6 +3,8 @@ import pymunk
 from core.organism_factory import OrganismFactory
 from core.substance_factory import SubstanceFactory
 from simulation.substance import Substance
+from simulation.matter import Matter
+from simulation.reactor import Reactor
 
 
 class World:
@@ -16,6 +18,9 @@ class World:
 
         food_handler = self.space.add_collision_handler(2, 1)
         food_handler.begin = self.on_organism_eat_substance
+
+        chemistry_handler = self.space.add_collision_handler(1, 1)
+        chemistry_handler.begin = self.on_substance_collision
 
         self.organisms = []
         self.substances = []
@@ -43,10 +48,41 @@ class World:
         substance = next((s for s in self.substances if s == substance_body), None)
 
         if organism and substance and organism.is_alive:
-            energy_gained = substance.matter.energy
+            energy_gained = organism.digest(substance.matter)
             organism.energy = min(organism.energy + energy_gained, organism.max_energy)
 
             self.remove_substance(substance)
+
+        return False
+
+    def on_substance_collision(self, arbiter, space, data):
+        shape1, shape2 = arbiter.shapes
+
+        substance_a = next((s for s in self.substances if s == shape1.body), None)
+        substance_b = next((s for s in self.substances if s == shape2.body), None)
+
+        if not substance_a or not substance_b or substance_a is substance_b:
+            return True
+
+        molecules = substance_a.matter.molecules + substance_b.matter.molecules
+        result = Reactor.react(molecules)
+
+        # Uncatalyzed free-chemistry reactions never break bonds (no available
+        # energy), so a positive delta means new bonds actually formed.
+        if result.energy_delta <= 0:
+            return True
+
+        position = substance_a.position
+        self.remove_substance(substance_a)
+        self.remove_substance(substance_b)
+
+        for product in result.products:
+            product_matter = Matter()
+            product_matter.add_molecule(product)
+
+            new_substance = Substance(product_matter, color=SubstanceFactory.color_for(product_matter))
+            new_substance.position = position
+            self.add_substance(new_substance)
 
         return False
 

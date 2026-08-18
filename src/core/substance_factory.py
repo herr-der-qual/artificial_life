@@ -4,6 +4,7 @@ import pymunk
 from simulation.substance import Substance
 from simulation.matter import Matter
 from simulation.elements import Elements
+from core.molecule_factory import MoleculeFactory
 
 
 class SubstanceFactory:
@@ -11,27 +12,27 @@ class SubstanceFactory:
 
     @staticmethod
     def create_basic():
-        """Create basic food substance with simple composition"""
+        """Create basic food substance with simple composition (CO2)"""
         matter = Matter()
-        matter.add_elements([Elements.C, Elements.O])
+        matter.add_molecule(MoleculeFactory.co2())
 
         substance = Substance(matter, color=(255, 200, 0))
         return substance
 
     @staticmethod
     def create_rich():
-        """Create nutrient-rich food substance"""
+        """Create nutrient-rich food substance (small organic molecule)"""
         matter = Matter()
-        matter.add_elements([Elements.C, Elements.C, Elements.O, Elements.N])
+        matter.add_molecule(MoleculeFactory.simple_organic())
 
         substance = Substance(matter, color=(255, 150, 0))
         return substance
 
     @staticmethod
     def create_simple():
-        """Create simple low-energy food"""
+        """Create simple low-energy food (water)"""
         matter = Matter()
-        matter.add_elements([Elements.H, Elements.O])
+        matter.add_molecule(MoleculeFactory.water())
 
         substance = Substance(matter, color=(255, 255, 0))
         return substance
@@ -69,3 +70,27 @@ class SubstanceFactory:
         x = random.uniform(min_x, max_x)
         y = random.uniform(min_y, max_y)
         return SubstanceFactory.spawn_at_position(substance_type, x, y)
+
+    ELEMENT_COLORS = {
+        Elements.C: (180, 120, 60),
+        Elements.O: (255, 100, 100),
+        Elements.H: (200, 200, 255),
+        Elements.N: (150, 150, 255),
+        Elements.S: (230, 230, 0),
+        Elements.P: (255, 150, 200),
+    }
+
+    @staticmethod
+    def color_for(matter: Matter):
+        """Derive a display color from a matter's dominant element - used for
+        substances produced by a reaction rather than a fixed recipe."""
+        if not matter.molecules:
+            return (200, 200, 200)
+
+        counts = {}
+        for molecule in matter.molecules:
+            for element, count in molecule.formula().items():
+                counts[element] = counts.get(element, 0) + count
+
+        dominant = max(counts.items(), key=lambda kv: kv[1])[0]
+        return SubstanceFactory.ELEMENT_COLORS.get(dominant, (200, 200, 200))

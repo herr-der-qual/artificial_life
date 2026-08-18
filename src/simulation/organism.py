@@ -3,6 +3,7 @@ import pymunk
 from ai.brain import Brain
 from simulation.matter import Matter
 from simulation.substance import Substance
+from simulation.reactor import Reactor
 
 
 class Organism(Substance):
@@ -32,3 +33,10 @@ class Organism(Substance):
     def die(self):
         self.is_alive = False
         self.energy = 0
+
+    def digest(self, matter: Matter) -> float:
+        """Break down eaten matter via the organism's metabolism (a
+        catalyzed reaction: digestive enzymes make otherwise costly bonds
+        cheap to break) and return the net energy released."""
+        result = Reactor.react(matter.molecules, catalyzed=True)
+        return result.energy_delta
