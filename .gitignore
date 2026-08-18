@@ -324,3 +324,4 @@ $RECYCLE.BIN/
 /.idea/
 
 /.claude/settings.local.json
+/settings.json
