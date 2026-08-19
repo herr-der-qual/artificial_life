@@ -1,4 +1,5 @@
 from simulation.matter import Matter
+from simulation.body_geometry import body_hull
 
 import pymunk
 
@@ -16,8 +17,13 @@ class Substance(pymunk.Body):
                  scale: float = 1.0):
         super().__init__(matter.mass, 1, body_type)
 
-        half = 4 * scale
-        self.shape = pymunk.Poly(self, [(-half, -half), (0, half), (half, -half)])
+        # Body shape is literally built from the matter it's made of - one
+        # cell-triangle per molecule, hulled into a single convex polygon
+        # (pymunk.Poly requires convex) - not just a uniformly scaled
+        # triangle. A 1-molecule body (most food, a freshly-random
+        # organism) reduces to exactly the original triangle.
+        vertices = body_hull(len(matter.molecules), scale)
+        self.shape = pymunk.Poly(self, vertices)
         self.shape.collision_type = 1
         self.matter = matter
         self.color = color
