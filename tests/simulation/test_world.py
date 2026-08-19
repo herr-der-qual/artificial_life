@@ -1,3 +1,5 @@
+import pytest
+
 from core.molecule_factory import MoleculeFactory
 from core.world_config import WorldConfig
 from simulation.elements import Elements
@@ -19,10 +21,10 @@ class FakeArbiter:
         self.shapes = (shape_a, shape_b)
 
 
-def make_organism(x=0.0, y=0.0, max_energy=200.0, fertile=False):
+def make_organism(x=0.0, y=0.0, max_energy=200.0, fertile=False, cell_count=1, diet=frozenset(FOOD_KINDS)):
     genome = Genome(speed=30.0, max_energy=max_energy, energy_drain_rate=10.0,
-                     search_radius=200.0, wander_radius=50.0, diet=frozenset(FOOD_KINDS),
-                     color=(0, 255, 0))
+                     search_radius=200.0, wander_radius=50.0, cell_count=cell_count,
+                     diet=diet, color=(0, 255, 0))
     matter = Matter()
     matter.add_molecule(MoleculeFactory.random_molecule([Elements.C], 2))
 
@@ -289,3 +291,142 @@ def test_reproduction_updates_births_total_and_generation_counters():
     assert world.total_organisms_count == total_before + 1
     assert world.max_generation_reached == 1
     assert len(world.organisms) == 3
+
+
+def make_solo_fertile_organism(x=0.0, y=0.0, max_energy=400.0):
+    """Meets the (higher) asexual budding threshold on its own - see
+    Organism.ASEXUAL_ENERGY_COST/ASEXUAL_MATTER_THRESHOLD."""
+    organism = make_organism(x=x, y=y, max_energy=max_energy)
+    organism.energy = max_energy
+
+    while organism.reserve.mass < Organism.ASEXUAL_MATTER_THRESHOLD:
+        extra = Matter()
+        extra.add_molecule(MoleculeFactory.simple_organic())
+        organism.digest(extra)
+
+    return organism
+
+
+def test_asexual_budding_reproduces_without_a_mate():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    organism = make_solo_fertile_organism()
+    world.add_organism(organism)
+    total_before = world.total_organisms_count
+
+    world.update(1 / 60)
+
+    assert world.births_count == 1
+    assert world.total_organisms_count == total_before + 1
+    assert world.max_generation_reached == 1
+    assert len(world.organisms) == 2
+
+
+def test_asexual_budding_does_not_fire_again_during_its_cooldown():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    organism = make_solo_fertile_organism()
+    world.add_organism(organism)
+
+    world.update(1 / 60)
+    assert world.births_count == 1
+
+    # even if the parent were re-fed instantly, the cooldown should block
+    # a second budding on the very next tick
+    world.update(1 / 60)
+    assert world.births_count == 1
+
+
+def test_bigger_predator_kills_and_eats_smaller_prey():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    predator = make_organism(cell_count=2, diet=frozenset({"flesh"}))
+    prey = make_organism(cell_count=1, diet=frozenset(FOOD_KINDS))
+    world.add_organism(predator)
+    world.add_organism(prey)
+    prey_mass = prey.matter.mass
+
+    arbiter = FakeArbiter(
+        FakeShape(predator, collision_type=2),
+        FakeShape(prey, collision_type=2),
+    )
+    world.on_organism_collision(arbiter, None, None)
+
+    assert not prey.is_alive
+    assert prey.removed
+    assert prey not in world.organisms
+    assert world.predation_count == 1
+    # prey's body is fully digested into the predator's reserve - mass is
+    # conserved through the reactor regardless of whether the reaction
+    # itself is net energy-positive or -negative (real chemistry, not a
+    # guaranteed windfall - see Organism.digest).
+    assert predator.reserve.mass == pytest.approx(prey_mass)
+
+
+def test_equal_sized_organisms_do_not_prey_on_each_other():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    a = make_organism(cell_count=1, diet=frozenset({"flesh"}))
+    b = make_organism(cell_count=1, diet=frozenset({"flesh"}))
+    world.add_organism(a)
+    world.add_organism(b)
+
+    arbiter = FakeArbiter(
+        FakeShape(a, collision_type=2),
+        FakeShape(b, collision_type=2),
+    )
+    world.on_organism_collision(arbiter, None, None)
+
+    assert a.is_alive and b.is_alive
+    assert world.predation_count == 0
+
+
+def test_bigger_organism_without_flesh_in_diet_does_not_prey():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    big_herbivore = make_organism(cell_count=3, diet=frozenset({"basic"}))
+    small_prey = make_organism(cell_count=1, diet=frozenset(FOOD_KINDS))
+    world.add_organism(big_herbivore)
+    world.add_organism(small_prey)
+
+    arbiter = FakeArbiter(
+        FakeShape(big_herbivore, collision_type=2),
+        FakeShape(small_prey, collision_type=2),
+    )
+    world.on_organism_collision(arbiter, None, None)
+
+    assert small_prey.is_alive
+    assert world.predation_count == 0
+
+
+def test_predation_takes_priority_over_reproduction():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    predator = make_organism(cell_count=2, diet=frozenset({"flesh"}), fertile=True)
+    smaller_fertile = make_organism(cell_count=1, diet=frozenset(FOOD_KINDS), fertile=True)
+    world.add_organism(predator)
+    world.add_organism(smaller_fertile)
+    total_before = world.total_organisms_count
+
+    arbiter = FakeArbiter(
+        FakeShape(predator, collision_type=2),
+        FakeShape(smaller_fertile, collision_type=2),
+    )
+    world.on_organism_collision(arbiter, None, None)
+
+    # eaten, not mated with - no child born
+    assert world.births_count == 0
+    assert world.predation_count == 1
+    assert world.total_organisms_count == total_before

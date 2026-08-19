@@ -8,8 +8,36 @@ from simulation.substance import FOOD_KINDS
 # that natural selection has variance to work with from the first generation.
 INITIAL_DIET_ACCEPT_CHANCE = 0.7
 
+# "flesh" (predation, see World._resolve_predation) starts far rarer than
+# ordinary food kinds - most of the population begins peaceful, and
+# predation only spreads from the rare mutant if it's actually a winning
+# strategy, rather than plunging every fresh population straight into
+# universal cannibalism.
+INITIAL_FLESH_ACCEPT_CHANCE = 0.05
+
 # Chance mutate() flips exactly one food kind's acceptance on/off.
 DIET_MUTATION_CHANCE = 0.15
+
+# Default strength passed to mutate() - also the baseline discrete chances
+# above are calibrated at. A caller passing a different `rate` scales the
+# diet/cell_count flip chances by the same ratio, so one number controls
+# both continuous jitter and discrete mutation strength together.
+BASE_MUTATION_RATE = 0.15
+
+# Sexual reproduction needs two organisms to physically find and reach each
+# other - slow and costly compared to solo budding (see Organism.
+# can_reproduce_asexually). Its payoff is much stronger variability, so it
+# stays worth pursuing as a source of diversity even though asexual budding
+# is the fast, primary way generations turn over.
+SEXUAL_MUTATION_RATE = 0.4
+
+# Chance mutate() nudges cell_count by +-1. Population starts unicellular
+# (Genome.random() always 1) - multicellularity only appears if it's
+# actually worth the energy/speed cost (see Organism), an emergent choice
+# of selection, not a starting assumption.
+CELL_COUNT_MUTATION_CHANCE = 0.15
+MIN_CELL_COUNT = 1
+MAX_CELL_COUNT = 10
 
 
 def _jitter(value: float, rate: float) -> float:
@@ -34,6 +62,14 @@ def _mutate_diet(diet: frozenset, rate: float) -> frozenset:
     return frozenset(mutated)
 
 
+def _mutate_cell_count(cell_count: int, rate: float) -> int:
+    if random.random() >= rate:
+        return cell_count
+
+    delta = random.choice((-1, 1))
+    return max(MIN_CELL_COUNT, min(MAX_CELL_COUNT, cell_count + delta))
+
+
 @dataclass
 class Genome:
     """Heritable traits: what a new organism starts with, independent of
@@ -44,6 +80,7 @@ class Genome:
     energy_drain_rate: float
     search_radius: float
     wander_radius: float
+    cell_count: int
     diet: frozenset
     color: tuple
 
@@ -54,18 +91,21 @@ class Genome:
             energy_drain_rate=random.choice((self.energy_drain_rate, other.energy_drain_rate)),
             search_radius=random.choice((self.search_radius, other.search_radius)),
             wander_radius=random.choice((self.wander_radius, other.wander_radius)),
+            cell_count=random.choice((self.cell_count, other.cell_count)),
             diet=random.choice((self.diet, other.diet)),
             color=random.choice((self.color, other.color)),
         )
 
-    def mutate(self, rate: float = 0.15) -> 'Genome':
+    def mutate(self, rate: float = BASE_MUTATION_RATE) -> 'Genome':
+        discrete_scale = rate / BASE_MUTATION_RATE
         return Genome(
             speed=_jitter(self.speed, rate),
             max_energy=_jitter(self.max_energy, rate),
             energy_drain_rate=_jitter(self.energy_drain_rate, rate),
             search_radius=_jitter(self.search_radius, rate),
             wander_radius=_jitter(self.wander_radius, rate),
-            diet=_mutate_diet(self.diet, DIET_MUTATION_CHANCE),
+            cell_count=_mutate_cell_count(self.cell_count, min(1.0, CELL_COUNT_MUTATION_CHANCE * discrete_scale)),
+            diet=_mutate_diet(self.diet, min(1.0, DIET_MUTATION_CHANCE * discrete_scale)),
             color=tuple(_jitter_channel(c, rate) for c in self.color),
         )
 
@@ -77,7 +117,11 @@ class Genome:
             energy_drain_rate=random.uniform(3, 9),
             search_radius=random.uniform(100, 300),
             wander_radius=random.uniform(30, 150),
-            diet=frozenset(k for k in FOOD_KINDS if random.random() < INITIAL_DIET_ACCEPT_CHANCE),
+            cell_count=1,
+            diet=frozenset(
+                k for k in FOOD_KINDS
+                if random.random() < (INITIAL_FLESH_ACCEPT_CHANCE if k == "flesh" else INITIAL_DIET_ACCEPT_CHANCE)
+            ),
             color=(
                 random.randint(150, 255),
                 random.randint(200, 255),

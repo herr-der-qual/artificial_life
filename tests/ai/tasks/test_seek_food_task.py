@@ -27,8 +27,8 @@ def make_food(x, y, kind="basic"):
 
 def make_organism(search_radius=200.0, diet=frozenset(FOOD_KINDS)):
     genome = Genome(speed=30.0, max_energy=100.0, energy_drain_rate=10.0,
-                     search_radius=search_radius, wander_radius=50.0, diet=diet,
-                     color=(0, 255, 0))
+                     search_radius=search_radius, wander_radius=50.0, cell_count=1,
+                     diet=diet, color=(0, 255, 0))
     matter = Matter()
     matter.add_molecule(MoleculeFactory.random_molecule([Elements.C], 2))
     return Organism(matter=matter, genome=genome)

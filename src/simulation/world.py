@@ -58,8 +58,11 @@ class World:
         self.deaths_count = 0
         self.births_count = 0
         self.food_eaten_count = 0
+        self.predation_count = 0
         self.max_generation_reached = 0
         self.food_spawn_timer = 0.0
+        self.immigration_timer = 0.0
+        self.immigrants_count = 0
 
         organism_bound = self.config.get("organism_spawn_bound")
         organism_count = self.config.get("initial_organism_count")
@@ -85,6 +88,21 @@ class World:
         organism_a = shape1.body
         organism_b = shape2.body
 
+        # Same double-processing hazard as substances: a collision `begin`
+        # can still fire for an organism another callback already killed
+        # earlier in this same physics step.
+        if organism_a.removed or organism_b.removed:
+            return False
+
+        predator, prey = self._resolve_predation(organism_a, organism_b)
+        if predator:
+            energy_gained = predator.digest(prey.matter)
+            predator.energy = min(predator.energy + energy_gained, predator.max_energy)
+            prey.die()
+            self.remove_organism(prey)
+            self.predation_count += 1
+            return True
+
         if organism_a.can_reproduce() and organism_b.can_reproduce():
             child = OrganismFactory.create_offspring(organism_a, organism_b)
             if child:
@@ -93,6 +111,18 @@ class World:
                 self.max_generation_reached = max(self.max_generation_reached, child.generation)
 
         return True
+
+    def _resolve_predation(self, organism_a, organism_b):
+        """Bigger cell_count preys on smaller, if predation is in its
+        evolved diet ('flesh' in FOOD_KINDS, see Genome.INITIAL_FLESH_
+        ACCEPT_CHANCE). Strict size advantage only - equal-sized organisms
+        never prey on each other, and a predator is always eligible prey
+        for anything bigger than itself."""
+        if "flesh" in organism_a.diet and organism_a.cell_count > organism_b.cell_count:
+            return organism_a, organism_b
+        if "flesh" in organism_b.diet and organism_b.cell_count > organism_a.cell_count:
+            return organism_b, organism_a
+        return None, None
 
     def on_organism_eat_substance(self, arbiter, space, data):
         shape1, shape2 = arbiter.shapes
@@ -192,6 +222,8 @@ class World:
         for organism in self.organisms:
             organism.update(delta_time)
 
+        self._reproduce_asexually()
+
         dead_organisms = [org for org in self.organisms if not org.is_alive]
         for organism in dead_organisms:
             corpse = self.convert_organism_to_substance(organism)
@@ -200,6 +232,50 @@ class World:
             self.deaths_count += 1
 
         self._spawn_food_over_time(delta_time)
+        self._rescue_population_if_crashed(delta_time)
+
+    def _reproduce_asexually(self):
+        """Budding: any organism eligible on its own (see Organism.
+        can_reproduce_asexually) splits off a child immediately, without
+        needing to find a mate. This is the primary, fast way generations
+        turn over - sexual reproduction (on_organism_collision) stays
+        available as a slower, costlier path that pays off in much
+        stronger mutation. Snapshot the eligible list first: add_organism
+        appends to self.organisms as children are born, and we must not
+        iterate that growing list."""
+        budding = [org for org in self.organisms if org.can_reproduce_asexually()]
+        for parent in budding:
+            child = OrganismFactory.create_offspring_asexual(parent)
+            if child:
+                self.add_organism(child)
+                self.births_count += 1
+                self.max_generation_reached = max(self.max_generation_reached, child.generation)
+
+    def _rescue_population_if_crashed(self, delta_time):
+        """Organisms only ever appear via reproduction - if the population
+        ever hits (near) zero there is nothing left to reproduce, a
+        permanent dead end no amount of balance tuning avoids (any random
+        walk with an absorbing state at 0 gets there eventually). Only
+        tops the population back up once it has actually crashed, so it
+        doesn't dilute evolution the rest of the time."""
+        interval = self.config.get("immigration_check_interval")
+        if not interval or interval <= 0:
+            return
+
+        self.immigration_timer += delta_time
+        if self.immigration_timer < interval:
+            return
+        self.immigration_timer -= interval
+
+        threshold = self.config.get("min_population_threshold")
+        if len(self.organisms) > threshold:
+            return
+
+        bound = self.config.get("organism_spawn_bound")
+        for _ in range(self.config.get("immigration_count")):
+            organism = OrganismFactory.create_random(bound=bound)
+            self.add_organism(organism)
+            self.immigrants_count += 1
 
     def _spawn_food_over_time(self, delta_time):
         interval = self.config.get("food_spawn_interval")

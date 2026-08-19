@@ -2,7 +2,7 @@ import random
 
 from core.organism_builder import OrganismBuilder
 from core.molecule_factory import MoleculeFactory
-from simulation.genome import Genome
+from simulation.genome import Genome, SEXUAL_MUTATION_RATE
 from simulation.matter import Matter
 from simulation.elements import Elements
 from simulation.organism import Organism
@@ -85,7 +85,10 @@ class OrganismFactory:
         for product in result.products:
             matter.add_molecule(product)
 
-        genome = parent_a.genome.crossover(parent_b.genome).mutate()
+        # Sexual reproduction pays off in much stronger variability than
+        # asexual budding - it's the slow, mate-dependent path, so the
+        # bonus needs to be worth the trouble.
+        genome = parent_a.genome.crossover(parent_b.genome).mutate(rate=SEXUAL_MUTATION_RATE)
         # Start at a healthy fraction of the child's OWN max_energy (plus any
         # exothermic bonus from combining the parents' reserves) rather than
         # a fixed absolute amount - otherwise a high-max_energy child is born
@@ -104,6 +107,44 @@ class OrganismFactory:
         return (
             OrganismBuilder()
                 .set_position(midpoint)
+                .set_genome(genome)
+                .set_matter(matter)
+                .set_starting_energy(starting_energy)
+                .set_generation(generation)
+                .build()
+        )
+
+    @staticmethod
+    def create_offspring_asexual(parent: Organism):
+        """Solo budding: the parent alone pays the full reproductive cost
+        (see Organism.can_reproduce_asexually) and hands over its entire
+        reserve to seed the child's body. No mate required, so this is the
+        fast, primary path generations turn over through - mutation stays
+        at the normal (non-sexual) strength."""
+        if not parent.can_reproduce_asexually():
+            return None
+
+        parent.energy -= Organism.ASEXUAL_ENERGY_COST
+        parent.reproduction_cooldown = Organism.REPRODUCE_COOLDOWN
+
+        reserve_molecules = parent.reserve.molecules
+        parent.reserve = Matter()
+
+        result = Reactor.react(reserve_molecules, catalyzed=True)
+        matter = Matter()
+        for product in result.products:
+            matter.add_molecule(product)
+
+        genome = parent.genome.mutate()
+        starting_energy = min(
+            genome.max_energy,
+            genome.max_energy * 0.6 + max(0.0, result.energy_delta),
+        )
+        generation = parent.generation + 1
+
+        return (
+            OrganismBuilder()
+                .set_position(parent.position)
                 .set_genome(genome)
                 .set_matter(matter)
                 .set_starting_energy(starting_energy)

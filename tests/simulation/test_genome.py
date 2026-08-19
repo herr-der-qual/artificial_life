@@ -5,8 +5,8 @@ from simulation.substance import FOOD_KINDS
 def make_genome(**overrides):
     defaults = dict(
         speed=30.0, max_energy=100.0, energy_drain_rate=10.0,
-        search_radius=200.0, wander_radius=50.0, diet=frozenset(FOOD_KINDS),
-        color=(100, 150, 200),
+        search_radius=200.0, wander_radius=50.0, cell_count=1,
+        diet=frozenset(FOOD_KINDS), color=(100, 150, 200),
     )
     defaults.update(overrides)
     return Genome(**defaults)

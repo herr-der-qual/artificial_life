@@ -13,6 +13,12 @@ class Organism(Substance):
     REPRODUCE_MATTER_THRESHOLD = 25.0
     REPRODUCE_COOLDOWN = 4.0
 
+    # Asexual budding pays the full reproductive cost alone - no partner to
+    # split it with - so it needs roughly what sexual reproduction spends in
+    # total across both parents, not just one parent's share.
+    ASEXUAL_ENERGY_COST = REPRODUCE_ENERGY_COST * 2.0
+    ASEXUAL_MATTER_THRESHOLD = REPRODUCE_MATTER_THRESHOLD * 2.0
+
     def __init__(self, matter: Matter, genome: Genome, starting_energy: float = None, generation: int = 0):
         super().__init__(matter, genome.color, body_type=pymunk.Body.KINEMATIC)
 
@@ -24,6 +30,7 @@ class Organism(Substance):
         self.energy_drain_rate = genome.energy_drain_rate
         self.search_radius = genome.search_radius
         self.wander_radius = genome.wander_radius
+        self.cell_count = genome.cell_count
         self.diet = genome.diet
         self.generation = generation
         self.is_alive = True
@@ -67,4 +74,12 @@ class Organism(Substance):
             and self.reproduction_cooldown <= 0
             and self.energy >= self.REPRODUCE_ENERGY_COST * self.REPRODUCE_ENERGY_SAFETY_MARGIN
             and self.reserve.mass >= self.REPRODUCE_MATTER_THRESHOLD
+        )
+
+    def can_reproduce_asexually(self) -> bool:
+        return (
+            self.is_alive
+            and self.reproduction_cooldown <= 0
+            and self.energy >= self.ASEXUAL_ENERGY_COST * self.REPRODUCE_ENERGY_SAFETY_MARGIN
+            and self.reserve.mass >= self.ASEXUAL_MATTER_THRESHOLD
         )

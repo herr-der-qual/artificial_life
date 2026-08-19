@@ -11,8 +11,8 @@ from core.molecule_factory import MoleculeFactory
 def make_simple_organism(**genome_overrides):
     defaults = dict(
         speed=30.0, max_energy=100.0, energy_drain_rate=10.0,
-        search_radius=200.0, wander_radius=50.0, diet=frozenset(FOOD_KINDS),
-        color=(0, 255, 0),
+        search_radius=200.0, wander_radius=50.0, cell_count=1,
+        diet=frozenset(FOOD_KINDS), color=(0, 255, 0),
     )
     defaults.update(genome_overrides)
     genome = Genome(**defaults)
@@ -43,7 +43,7 @@ def test_wander_radius_and_diet_come_from_genome():
 def test_starting_energy_can_be_overridden():
     genome = Genome(
         speed=30, max_energy=100, energy_drain_rate=10, search_radius=200,
-        wander_radius=50, diet=frozenset(FOOD_KINDS), color=(0, 255, 0),
+        wander_radius=50, cell_count=1, diet=frozenset(FOOD_KINDS), color=(0, 255, 0),
     )
     matter = Matter()
     matter.add_molecule(MoleculeFactory.random_molecule([Elements.C], 2))
@@ -111,3 +111,37 @@ def test_reproduction_cooldown_blocks_and_then_expires():
 
     organism.reproduction_cooldown = 0.0
     assert organism.can_reproduce()
+
+
+def test_cannot_reproduce_asexually_without_enough_energy_or_reserve():
+    organism = make_simple_organism(max_energy=100.0)
+    organism.energy = 100.0
+    assert not organism.can_reproduce_asexually()  # no reserve yet
+
+
+def test_can_reproduce_asexually_once_energy_and_reserve_thresholds_are_met():
+    organism = make_simple_organism(max_energy=400.0)
+    organism.energy = 400.0
+
+    while organism.reserve.mass < Organism.ASEXUAL_MATTER_THRESHOLD:
+        extra = Matter()
+        extra.add_molecule(MoleculeFactory.simple_organic())
+        organism.digest(extra)
+
+    assert organism.can_reproduce_asexually()
+
+
+def test_sexual_eligibility_alone_is_not_enough_for_asexual_budding():
+    """Asexual budding needs roughly double what one sexual parent needs
+    (see Organism.ASEXUAL_ENERGY_COST/ASEXUAL_MATTER_THRESHOLD) - meeting
+    only the (lower) sexual bar must not also unlock solo reproduction."""
+    organism = make_simple_organism(max_energy=200.0)
+    organism.energy = 200.0
+
+    while organism.reserve.mass < Organism.REPRODUCE_MATTER_THRESHOLD:
+        extra = Matter()
+        extra.add_molecule(MoleculeFactory.simple_organic())
+        organism.digest(extra)
+
+    assert organism.can_reproduce()
+    assert not organism.can_reproduce_asexually()
