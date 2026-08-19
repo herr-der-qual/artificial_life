@@ -43,8 +43,9 @@ class Renderer:
             sprite = self._sprites_by_id.get(key)
             if sprite is None:
                 sprite = arcade.Sprite(self._texture)
-                sprite.width = self.SHAPE_SIZE
-                sprite.height = self.SHAPE_SIZE
+                size = self.SHAPE_SIZE * item.scale
+                sprite.width = size
+                sprite.height = size
                 self._sprites_by_id[key] = sprite
                 self.sprite_list.append(sprite)
 

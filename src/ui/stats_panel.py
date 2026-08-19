@@ -37,15 +37,19 @@ class StatsPanel:
         self.alive_label = arcade.gui.UILabel(text="Alive: 0", width=content_width)
         self.deaths_label = arcade.gui.UILabel(text="Deaths: 0", width=content_width)
         self.births_label = arcade.gui.UILabel(text="Born: 0", width=content_width)
+        self.immigrants_label = arcade.gui.UILabel(text="Immigrants: 0", width=content_width)
         self.food_label = arcade.gui.UILabel(text="Food eaten: 0", width=content_width)
+        self.predation_label = arcade.gui.UILabel(text="Predation: 0", width=content_width)
         self.energy_label = arcade.gui.UILabel(text="Avg energy: 0%", width=content_width)
         self.speed_label = arcade.gui.UILabel(text="Avg speed: 0.0", width=content_width)
         self.radius_label = arcade.gui.UILabel(text="Avg search radius: 0", width=content_width)
         self.generation_label = arcade.gui.UILabel(text="Max generation: 0", width=content_width)
+        self.cell_count_label = arcade.gui.UILabel(text="Avg/Max cells: 0.0 / 0", width=content_width)
 
         for label in (
-            self.total_label, self.alive_label, self.deaths_label, self.births_label, self.food_label,
-            self.energy_label, self.speed_label, self.radius_label, self.generation_label,
+            self.total_label, self.alive_label, self.deaths_label, self.births_label, self.immigrants_label,
+            self.food_label, self.predation_label, self.energy_label, self.speed_label, self.radius_label,
+            self.generation_label, self.cell_count_label,
         ):
             stack.add(label)
 
@@ -122,18 +126,25 @@ class StatsPanel:
         self.alive_label.text = f"Alive: {alive}"
         self.deaths_label.text = f"Deaths: {self.world.deaths_count}"
         self.births_label.text = f"Born: {self.world.births_count}"
+        self.immigrants_label.text = f"Immigrants: {self.world.immigrants_count}"
         self.food_label.text = f"Food eaten: {self.world.food_eaten_count} (left: {len(self.world.substances)})"
+        self.predation_label.text = f"Predation: {self.world.predation_count}"
 
         if organisms:
             avg_energy_ratio = sum(o.energy / o.max_energy for o in organisms) / alive * 100
             avg_speed = sum(o.genome.speed for o in organisms) / alive
             avg_radius = sum(o.genome.search_radius for o in organisms) / alive
+            avg_cell_count = sum(o.cell_count for o in organisms) / alive
+            max_cell_count = max(o.cell_count for o in organisms)
         else:
             avg_energy_ratio = 0.0
             avg_speed = 0.0
             avg_radius = 0.0
+            avg_cell_count = 0.0
+            max_cell_count = 0
 
         self.energy_label.text = f"Avg energy: {avg_energy_ratio:.0f}%"
         self.speed_label.text = f"Avg speed: {avg_speed:.1f}"
         self.radius_label.text = f"Avg search radius: {avg_radius:.0f}"
         self.generation_label.text = f"Max generation: {self.world.max_generation_reached}"
+        self.cell_count_label.text = f"Avg/Max cells: {avg_cell_count:.1f} / {max_cell_count}"

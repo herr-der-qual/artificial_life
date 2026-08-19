@@ -57,6 +57,21 @@ def test_create_random_produces_a_valid_organism():
     assert organism.energy == organism.max_energy
 
 
+def test_create_random_builds_one_molecule_per_cell(monkeypatch):
+    """A multicellular body plan is one molecule per cell (see
+    OrganismFactory.create_random) - Genome.random() always starts at
+    cell_count=1, so force a bigger value to exercise the loop."""
+    multicellular_genome = Genome(
+        speed=30.0, max_energy=100.0, energy_drain_rate=10.0, search_radius=200.0,
+        wander_radius=50.0, cell_count=4, diet=frozenset(FOOD_KINDS), color=(0, 255, 0),
+    )
+    monkeypatch.setattr(Genome, "random", staticmethod(lambda: multicellular_genome))
+
+    organism = OrganismFactory.create_random()
+
+    assert len(organism.matter.molecules) == 4
+
+
 def test_create_offspring_returns_none_if_a_parent_is_not_eligible():
     fertile = make_fertile_organism()
     infertile = make_fertile_organism()

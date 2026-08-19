@@ -19,18 +19,31 @@ class Organism(Substance):
     ASEXUAL_ENERGY_COST = REPRODUCE_ENERGY_COST * 2.0
     ASEXUAL_MATTER_THRESHOLD = REPRODUCE_MATTER_THRESHOLD * 2.0
 
+    # Multicellularity trade-off: each extra cell (beyond the first) grows
+    # the energy reserve but costs more to run and slows the body down - so
+    # cell_count only spreads if the trade is actually worth it (e.g. the
+    # size advantage predation gives, see World._resolve_predation), not a
+    # free win handed out by the gene alone.
+    CELL_ENERGY_BONUS_PER_CELL = 0.5
+    CELL_DRAIN_PENALTY_PER_CELL = 0.3
+    CELL_SPEED_PENALTY_PER_CELL = 0.2
+    CELL_SIZE_SCALE_PER_CELL = 0.3
+
     def __init__(self, matter: Matter, genome: Genome, starting_energy: float = None, generation: int = 0):
-        super().__init__(matter, genome.color, body_type=pymunk.Body.KINEMATIC)
+        extra_cells = genome.cell_count - 1
+        scale = 1 + self.CELL_SIZE_SCALE_PER_CELL * extra_cells
+
+        super().__init__(matter, genome.color, body_type=pymunk.Body.KINEMATIC, scale=scale)
 
         self.genome = genome
         self.brain = Brain(self)
-        self.speed = genome.speed
-        self.max_energy = genome.max_energy
-        self.energy = genome.max_energy if starting_energy is None else starting_energy
-        self.energy_drain_rate = genome.energy_drain_rate
+        self.cell_count = genome.cell_count
+        self.max_energy = genome.max_energy * (1 + self.CELL_ENERGY_BONUS_PER_CELL * extra_cells)
+        self.energy = self.max_energy if starting_energy is None else starting_energy
+        self.energy_drain_rate = genome.energy_drain_rate * (1 + self.CELL_DRAIN_PENALTY_PER_CELL * extra_cells)
+        self.speed = genome.speed / (1 + self.CELL_SPEED_PENALTY_PER_CELL * extra_cells)
         self.search_radius = genome.search_radius
         self.wander_radius = genome.wander_radius
-        self.cell_count = genome.cell_count
         self.diet = genome.diet
         self.generation = generation
         self.is_alive = True

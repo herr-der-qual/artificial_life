@@ -28,6 +28,33 @@ def test_starting_energy_defaults_to_max_energy():
     assert organism.energy == 80.0
 
 
+def test_single_cell_organism_matches_raw_genome_values():
+    """cell_count=1 (extra_cells=0) must be a no-op on top of the raw
+    genome - every existing organism in the population before this trait
+    mattered was implicitly cell_count=1."""
+    organism = make_simple_organism(speed=42.0, max_energy=123.0, energy_drain_rate=7.0, cell_count=1)
+    assert organism.speed == pytest.approx(42.0)
+    assert organism.max_energy == pytest.approx(123.0)
+    assert organism.energy_drain_rate == pytest.approx(7.0)
+    assert organism.scale == pytest.approx(1.0)
+
+
+def test_extra_cells_trade_energy_reserve_for_drain_and_speed():
+    organism = make_simple_organism(speed=30.0, max_energy=100.0, energy_drain_rate=10.0, cell_count=3)
+
+    # extra_cells = 2
+    assert organism.max_energy == pytest.approx(100.0 * (1 + 0.5 * 2))
+    assert organism.energy_drain_rate == pytest.approx(10.0 * (1 + 0.3 * 2))
+    assert organism.speed == pytest.approx(30.0 / (1 + 0.2 * 2))
+    assert organism.scale == pytest.approx(1 + 0.3 * 2)
+
+
+def test_starting_energy_defaults_to_the_cell_count_adjusted_max_energy():
+    organism = make_simple_organism(max_energy=100.0, cell_count=3)
+    assert organism.energy == organism.max_energy
+    assert organism.energy == pytest.approx(200.0)
+
+
 def test_search_radius_comes_from_genome():
     organism = make_simple_organism(search_radius=123.0)
     assert organism.search_radius == 123.0

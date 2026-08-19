@@ -29,8 +29,9 @@ class OrganismFactory:
         genome = Genome.random()
 
         matter = Matter()
-        num_atoms = random.randint(2, 6)
-        matter.add_molecule(MoleculeFactory.random_molecule(OrganismFactory.BODY_ELEMENTS, num_atoms))
+        for _ in range(genome.cell_count):
+            num_atoms = random.randint(2, 6)
+            matter.add_molecule(MoleculeFactory.random_molecule(OrganismFactory.BODY_ELEMENTS, num_atoms))
 
         x = random.uniform(-bound, bound)
         y = random.uniform(-bound, bound)

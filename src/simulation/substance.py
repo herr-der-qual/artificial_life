@@ -12,14 +12,17 @@ FOOD_KINDS = ("basic", "rich", "simple", "corpse", "reaction_product", "flesh")
 
 
 class Substance(pymunk.Body):
-    def __init__(self, matter: Matter, color, body_type = pymunk.Body.KINEMATIC, kind: str = None):
+    def __init__(self, matter: Matter, color, body_type = pymunk.Body.KINEMATIC, kind: str = None,
+                 scale: float = 1.0):
         super().__init__(matter.mass, 1, body_type)
 
-        self.shape = pymunk.Poly(self, [(-4, -4), (0, 4), (4, -4)])
+        half = 4 * scale
+        self.shape = pymunk.Poly(self, [(-half, -half), (0, half), (half, -half)])
         self.shape.collision_type = 1
         self.matter = matter
         self.color = color
         self.kind = kind
+        self.scale = scale
         # Cheap O(1) "is this still in the world" check for tasks caching a
         # target across frames, instead of an O(n) `in world.substances`.
         self.removed = False
