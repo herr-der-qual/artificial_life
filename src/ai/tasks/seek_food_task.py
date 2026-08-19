@@ -1,3 +1,5 @@
+import math
+
 import pymunk
 from .task import Task
 
@@ -44,7 +46,7 @@ class SeekFoodTask(Task):
     def do(self):
         """Execute the task: seek and move towards nearest food"""
         if not self.world.substances:
-            self.organism.velocity = pymunk.Vec2d(0, 0)
+            self.organism.velocity = (0.0, 0.0)
             return True
 
         # Find or update target
@@ -53,23 +55,30 @@ class SeekFoodTask(Task):
 
         # No food found within range
         if self.target_food is None:
-            self.organism.velocity = pymunk.Vec2d(0, 0)
+            self.organism.velocity = (0.0, 0.0)
             return True
 
-        distance = self.target_food.position - self.organism.position
-        distance_length = distance.length
+        # Plain-float math instead of pymunk.Vec2d arithmetic - Vec2d's
+        # operators assert isinstance(other, numbers.Real) on every call,
+        # and numbers.Real is an ABC, so at thousands of organisms/tick
+        # this alone dominated profiled step time (see perf notes).
+        food_position = self.target_food.position
+        position = self.organism.position
+        dx = food_position.x - position.x
+        dy = food_position.y - position.y
+        distance_length = math.hypot(dx, dy)
 
         if distance_length < 10:
             if distance_length > 0:
-                norm_dir = distance.normalized()
-                self.organism.velocity = norm_dir * (self.organism.speed * 0.5)
+                scale = (self.organism.speed * 0.5) / distance_length
+                self.organism.velocity = (dx * scale, dy * scale)
             return False
 
         # Move towards food at full speed
         if distance_length > 0:
-            norm_dir = distance.normalized()
-            self.organism.velocity = norm_dir * self.organism.speed
+            scale = self.organism.speed / distance_length
+            self.organism.velocity = (dx * scale, dy * scale)
         else:
-            self.organism.velocity = pymunk.Vec2d(0, 0)
+            self.organism.velocity = (0.0, 0.0)
 
         return False  # Task not complete, keep seeking

@@ -299,4 +299,8 @@ class World:
             self.add_substance(substance)
 
     def fixed_update(self, delta_time):
-        self.space.step(0.1)
+        """`delta_time` is the physics dt, not necessarily the metabolism
+        dt - callers (see SimulationRunner) deliberately pass a scaled-up
+        value so movement stays watchable independent of how fast energy/
+        reproduction are actually ticking."""
+        self.space.step(delta_time)

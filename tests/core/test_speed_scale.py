@@ -2,7 +2,10 @@ import math
 
 import pytest
 
-from core.speed_scale import slider_to_fps, fps_to_slider, format_fps, MIN_FPS, MAX_FINITE_FPS
+from core.speed_scale import (
+    slider_to_fps, fps_to_slider, format_fps, fps_to_physics_multiplier,
+    MIN_FPS, MAX_FINITE_FPS, MIN_PHYSICS_MULTIPLIER, MAX_PHYSICS_MULTIPLIER, INFINITE_PHYSICS_MULTIPLIER,
+)
 
 
 def test_min_slider_gives_min_fps():
@@ -43,3 +46,23 @@ def test_out_of_range_slider_values_are_clamped():
 def test_format_fps():
     assert format_fps(60.0) == "60"
     assert format_fps(math.inf) == "MAX"
+
+
+def test_min_fps_gives_min_physics_multiplier():
+    assert fps_to_physics_multiplier(MIN_FPS) == pytest.approx(MIN_PHYSICS_MULTIPLIER)
+
+
+def test_max_finite_fps_gives_max_physics_multiplier():
+    assert fps_to_physics_multiplier(MAX_FINITE_FPS) == pytest.approx(MAX_PHYSICS_MULTIPLIER)
+
+
+def test_infinite_fps_gets_its_own_dedicated_multiplier():
+    """MAX should feel qualitatively faster than just "a high finite
+    number", not merely the log curve's endpoint."""
+    assert fps_to_physics_multiplier(math.inf) == pytest.approx(INFINITE_PHYSICS_MULTIPLIER)
+    assert INFINITE_PHYSICS_MULTIPLIER > MAX_PHYSICS_MULTIPLIER
+
+
+def test_physics_multiplier_is_monotonic_across_finite_fps():
+    values = [fps_to_physics_multiplier(fps) for fps in (1.0, 5.0, 60.0, 500.0, 1000.0)]
+    assert values == sorted(values)

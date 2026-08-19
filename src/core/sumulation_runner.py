@@ -2,6 +2,8 @@ import math
 import threading
 import time
 
+from core.speed_scale import fps_to_physics_multiplier
+
 FIXED_DT = 1.0 / 60
 IDLE_SLEEP = 0.05  # while paused with nothing queued, avoid busy-spinning
 
@@ -62,7 +64,12 @@ class SimulationRunner:
 
                 if did_step:
                     self.world.update(FIXED_DT)
-                    self.world.fixed_update(FIXED_DT)
+                    # Physics gets a speed-slider-scaled dt so movement is
+                    # visibly livelier at higher settings, on top of the
+                    # extra ticks/sec - metabolism above stays on the
+                    # honest FIXED_DT clock regardless.
+                    physics_dt = FIXED_DT * fps_to_physics_multiplier(self.target_fps)
+                    self.world.fixed_update(physics_dt)
 
             if not did_step:
                 time.sleep(IDLE_SLEEP)

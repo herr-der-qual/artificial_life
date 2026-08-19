@@ -1,19 +1,24 @@
 import math
 import time
 
-from core.sumulation_runner import SimulationRunner
+import pytest
+
+from core.sumulation_runner import SimulationRunner, FIXED_DT
+from core.speed_scale import fps_to_physics_multiplier
 
 
 class FakeWorld:
     def __init__(self):
         self.update_calls = 0
         self.fixed_update_calls = 0
+        self.last_fixed_update_dt = None
 
     def update(self, dt):
         self.update_calls += 1
 
     def fixed_update(self, dt):
         self.fixed_update_calls += 1
+        self.last_fixed_update_dt = dt
 
 
 def wait_for_pending_steps_to_drain(runner, timeout=1.0):
@@ -99,6 +104,22 @@ def test_uncapped_speed_runs_many_steps_quickly():
     # An empty-loop step is essentially free; uncapped should comfortably
     # clear a few hundred iterations in 50ms.
     assert world.update_calls > 100
+
+
+def test_physics_dt_scales_with_target_fps_not_just_metabolism_dt():
+    """Movement (fixed_update) is deliberately scaled by the speed slider
+    on top of the tick rate, so slow/fast settings feel different even
+    within one tick - metabolism (update) always gets the honest FIXED_DT."""
+    world = FakeWorld()
+    runner = SimulationRunner(world, target_fps=math.inf, paused=True)
+    runner.start()
+
+    runner.step(1)
+    wait_for_pending_steps_to_drain(runner)
+    runner.stop()
+
+    expected = FIXED_DT * fps_to_physics_multiplier(math.inf)
+    assert world.last_fixed_update_dt == pytest.approx(expected)
 
 
 def test_capped_speed_limits_steps():

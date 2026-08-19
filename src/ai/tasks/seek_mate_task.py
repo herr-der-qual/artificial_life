@@ -1,3 +1,5 @@
+import math
+
 import pymunk
 from .task import Task
 
@@ -42,19 +44,26 @@ class SeekMateTask(Task):
             self.target_mate = self.find_nearest_mate()
 
         if self.target_mate is None:
-            self.organism.velocity = pymunk.Vec2d(0, 0)
+            self.organism.velocity = (0.0, 0.0)
             return True
 
-        distance = self.target_mate.position - self.organism.position
-        distance_length = distance.length
+        # Plain-float math instead of pymunk.Vec2d arithmetic - Vec2d's
+        # operators assert isinstance(other, numbers.Real) on every call,
+        # and numbers.Real is an ABC, so at thousands of organisms/tick
+        # this alone dominated profiled step time (see perf notes).
+        mate_position = self.target_mate.position
+        position = self.organism.position
+        dx = mate_position.x - position.x
+        dy = mate_position.y - position.y
+        distance_length = math.hypot(dx, dy)
 
         if distance_length < 10:
             if distance_length > 0:
-                norm_dir = distance.normalized()
-                self.organism.velocity = norm_dir * (self.organism.speed * 0.5)
+                scale = (self.organism.speed * 0.5) / distance_length
+                self.organism.velocity = (dx * scale, dy * scale)
             return False
 
-        norm_dir = distance.normalized()
-        self.organism.velocity = norm_dir * self.organism.speed
+        scale = self.organism.speed / distance_length
+        self.organism.velocity = (dx * scale, dy * scale)
 
         return False
