@@ -47,7 +47,7 @@ def format_fps(fps) -> str:
 # high end feel dramatically faster, on top of the extra ticks/sec.
 MIN_PHYSICS_MULTIPLIER = 3.0
 MAX_PHYSICS_MULTIPLIER = 20.0
-INFINITE_PHYSICS_MULTIPLIER = 40.0
+INFINITE_PHYSICS_MULTIPLIER = 140.0
 
 
 def fps_to_physics_multiplier(fps) -> float:

@@ -15,14 +15,6 @@ from .save_as_dialog import SaveAsDialog
 
 
 class WorldView(arcade.View):
-    # Above this simulation target FPS, drawing every frame at a full 60fps
-    # just burns GIL time the simulation thread could otherwise use to run
-    # more steps - Python threads share one core's worth of GIL, so a
-    # cheaper draw schedule directly buys the sim thread more throughput.
-    FAST_SIM_FPS_THRESHOLD = 100
-    NORMAL_DRAW_RATE = 1 / 60
-    FAST_SIM_DRAW_RATE = 1 / 10
-
     def __init__(self):
         super().__init__()
 
@@ -53,7 +45,6 @@ class WorldView(arcade.View):
         self.save_as_dialog = SaveAsDialog(on_confirm=self.save_world_as, default_directory=default_dir)
 
         self.ui_hidden = self.settings.get("ui_hidden")
-        self._current_draw_rate = self.NORMAL_DRAW_RATE
 
     def load_world(self, path):
         """Adopt `path` as the active world config and rebuild the running
@@ -102,15 +93,6 @@ class WorldView(arcade.View):
         self.control_panel.on_update(delta_time)
         self.stats_panel.on_update(delta_time)
         self.settings.set("stats_panel_open", self.stats_panel.is_open)
-        self._sync_draw_rate()
-
-    def _sync_draw_rate(self):
-        running_fast = self.runner.target_fps == math.inf or self.runner.target_fps > self.FAST_SIM_FPS_THRESHOLD
-        desired_rate = self.FAST_SIM_DRAW_RATE if running_fast else self.NORMAL_DRAW_RATE
-
-        if desired_rate != self._current_draw_rate:
-            self._current_draw_rate = desired_rate
-            self.window.set_draw_rate(desired_rate)
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.H and modifiers & arcade.key.MOD_CTRL:

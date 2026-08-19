@@ -1,6 +1,6 @@
 import math
 
-from .task import Task
+from .task import Task, seek_velocity
 
 
 class WaypointTask(Task):
@@ -23,10 +23,8 @@ class WaypointTask(Task):
             self.organism.velocity = (0.0, 0.0)
             return True
 
-        if distance_length > 0:
-            scale = self.organism.speed / distance_length
-            self.organism.velocity = (dx * scale, dy * scale)
-        else:
-            self.organism.velocity = (0.0, 0.0)
+        world = self.organism.brain.world
+        physics_dt = world.physics_dt if world else 1 / 60
+        self.organism.velocity = seek_velocity(dx, dy, distance_length, self.organism.speed, physics_dt)
 
         return False

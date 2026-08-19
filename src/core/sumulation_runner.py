@@ -63,13 +63,16 @@ class SimulationRunner:
                     did_step = True
 
                 if did_step:
-                    self.world.update(FIXED_DT)
                     # Physics gets a speed-slider-scaled dt so movement is
                     # visibly livelier at higher settings, on top of the
-                    # extra ticks/sec - metabolism above stays on the
-                    # honest FIXED_DT clock regardless.
-                    physics_dt = FIXED_DT * fps_to_physics_multiplier(self.target_fps)
-                    self.world.fixed_update(physics_dt)
+                    # extra ticks/sec - metabolism below stays on the
+                    # honest FIXED_DT clock regardless. Set on the world
+                    # before update() so seek tasks can read it this tick
+                    # too (see World.physics_dt) and clamp against
+                    # overshooting a target they're about to reach.
+                    self.world.physics_dt = FIXED_DT * fps_to_physics_multiplier(self.target_fps)
+                    self.world.update(FIXED_DT)
+                    self.world.fixed_update(self.world.physics_dt)
 
             if not did_step:
                 time.sleep(IDLE_SLEEP)

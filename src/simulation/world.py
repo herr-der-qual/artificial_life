@@ -34,6 +34,14 @@ class World:
     def __init__(self, config: WorldConfig = None):
         self.config = config or WorldConfig()
 
+        # The physics dt the NEXT fixed_update() will actually use (see
+        # SimulationRunner) - tasks read this while seeking a target so
+        # they can clamp velocity and not overshoot past it when the
+        # speed slider scales physics_dt way up (see ai/tasks/task.py:
+        # seek_velocity). Defaults to a plain, unscaled tick for anything
+        # that builds a World without a SimulationRunner (tests, etc).
+        self.physics_dt = 1 / 60
+
         self.space = pymunk.Space()
         self.space.gravity = (0, 0)
         # Was use_spatial_hash(10, 10000) - a fixed cell size tuned for one

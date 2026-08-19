@@ -1,7 +1,7 @@
 import math
 
 import pymunk
-from .task import Task
+from .task import Task, seek_velocity
 
 
 class SeekMateTask(Task):
@@ -56,14 +56,11 @@ class SeekMateTask(Task):
         dx = mate_position.x - position.x
         dy = mate_position.y - position.y
         distance_length = math.hypot(dx, dy)
+        physics_dt = self.world.physics_dt
 
         if distance_length < 10:
-            if distance_length > 0:
-                scale = (self.organism.speed * 0.5) / distance_length
-                self.organism.velocity = (dx * scale, dy * scale)
+            self.organism.velocity = seek_velocity(dx, dy, distance_length, self.organism.speed * 0.5, physics_dt)
             return False
 
-        scale = self.organism.speed / distance_length
-        self.organism.velocity = (dx * scale, dy * scale)
-
+        self.organism.velocity = seek_velocity(dx, dy, distance_length, self.organism.speed, physics_dt)
         return False

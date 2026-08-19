@@ -1,7 +1,7 @@
 import math
 
 import pymunk
-from .task import Task
+from .task import Task, seek_velocity
 
 
 class SeekFoodTask(Task):
@@ -67,18 +67,12 @@ class SeekFoodTask(Task):
         dx = food_position.x - position.x
         dy = food_position.y - position.y
         distance_length = math.hypot(dx, dy)
+        physics_dt = self.world.physics_dt
 
         if distance_length < 10:
-            if distance_length > 0:
-                scale = (self.organism.speed * 0.5) / distance_length
-                self.organism.velocity = (dx * scale, dy * scale)
+            self.organism.velocity = seek_velocity(dx, dy, distance_length, self.organism.speed * 0.5, physics_dt)
             return False
 
         # Move towards food at full speed
-        if distance_length > 0:
-            scale = self.organism.speed / distance_length
-            self.organism.velocity = (dx * scale, dy * scale)
-        else:
-            self.organism.velocity = (0.0, 0.0)
-
+        self.organism.velocity = seek_velocity(dx, dy, distance_length, self.organism.speed, physics_dt)
         return False  # Task not complete, keep seeking
