@@ -9,7 +9,6 @@ class SeekFoodTask(Task):
         self.organism = organism
         self.world = world
         self.target_food = None
-        self.search_radius = 200  # How far organism can "see" food
 
     def find_nearest_food(self):
         """Find the nearest substance within search radius"""
@@ -23,7 +22,7 @@ class SeekFoodTask(Task):
             distance = (substance.position - self.organism.position).length
 
             # Only consider food within search radius
-            if distance < self.search_radius and distance < min_distance:
+            if distance < self.organism.search_radius and distance < min_distance:
                 min_distance = distance
                 nearest = substance
 

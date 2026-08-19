@@ -1,7 +1,8 @@
 import random
 
-from ai.tasks import *
-from ai.tasks.seek_food_task import SeekFoodTask
+from ai.tasks.task import Task
+from ai.tasks.waypoint_task import WaypointTask
+from ai.goals import HungerGoal, MatingGoal
 
 
 class Brain:
@@ -9,15 +10,24 @@ class Brain:
         self.organism = organism
         self.tasks: list[Task] = []
         self.world = None
-        self.hunger_threshold = 0.4
+
+        # Priority order: survival goals before anything else.
+        self.goals = [
+            HungerGoal(),
+            MatingGoal(),
+        ]
 
     def add_task(self, task: Task):
         self.tasks.append(task)
 
     def update(self):
-        if self.should_seek_food():
-            self.tasks.clear()
-            self.add_task(SeekFoodTask(self.organism, self.world))
+        active_goal = self._active_goal()
+
+        if active_goal is not None:
+            already_pursuing = self.tasks and active_goal.matches_current(self.tasks[0])
+            if not already_pursuing:
+                self.tasks.clear()
+                self.add_task(active_goal.create_task(self.organism, self.world))
 
         if not self.tasks:
             self.generate_task()
@@ -27,17 +37,11 @@ class Brain:
         if current_task.do():
             self.tasks.pop(0)
 
-    def should_seek_food(self):
-        if not self.world or not self.world.substances:
-            return False
-
-        # Already seeking food
-        if self.tasks and isinstance(self.tasks[0], SeekFoodTask):
-            return False
-
-        # Check if energy is below hunger threshold
-        energy_ratio = self.organism.energy / self.organism.max_energy
-        return energy_ratio < self.hunger_threshold
+    def _active_goal(self):
+        for goal in self.goals:
+            if goal.is_active(self.organism, self.world):
+                return goal
+        return None
 
     def generate_task(self):
         min_radius = 5

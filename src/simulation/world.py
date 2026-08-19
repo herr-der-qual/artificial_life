@@ -36,6 +36,15 @@ class World:
 
     def on_organism_collision(self, arbiter, space, data):
         shape1, shape2 = arbiter.shapes
+
+        organism_a = next((o for o in self.organisms if o == shape1.body), None)
+        organism_b = next((o for o in self.organisms if o == shape2.body), None)
+
+        if organism_a and organism_b and organism_a.can_reproduce() and organism_b.can_reproduce():
+            child = OrganismFactory.create_offspring(organism_a, organism_b)
+            if child:
+                self.add_organism(child)
+
         return True
 
     def on_organism_eat_substance(self, arbiter, space, data):
