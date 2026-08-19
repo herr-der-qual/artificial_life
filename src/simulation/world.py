@@ -73,6 +73,14 @@ class World:
         self.immigrants_count = 0
 
         organism_bound = self.config.get("organism_spawn_bound")
+        substance_bound = self.config.get("substance_spawn_bound")
+        # Edge of the playable field - organisms are clamped inside it every
+        # physics step (see _clamp_to_bounds) so an unbounded random walk
+        # doesn't wander off into empty space over enough ticks/generations.
+        # Auto-derive a comfortable margin around the spawn area unless the
+        # config pins an explicit value.
+        self.world_bound = self.config.get("world_bound") or max(organism_bound, substance_bound) * 1.5
+
         organism_count = self.config.get("initial_organism_count")
         for i in range(organism_count):
             organism = OrganismFactory.create_random(bound=organism_bound)
@@ -80,7 +88,6 @@ class World:
             self.add_organism(organism)
 
         # Spawn initial food substances
-        substance_bound = self.config.get("substance_spawn_bound")
         for _ in range(self.config.get("initial_substance_count")):
             substance = SubstanceFactory.spawn_random_in_bounds(
                 -substance_bound, substance_bound, -substance_bound, substance_bound,
@@ -312,3 +319,23 @@ class World:
         value so movement stays watchable independent of how fast energy/
         reproduction are actually ticking."""
         self.space.step(delta_time)
+        self._clamp_to_bounds()
+
+    def _clamp_to_bounds(self):
+        """Keep organisms inside the playable field. Only clamps position
+        (not a physical bounce) and zeroes velocity on whichever axis got
+        clamped - so an organism pinned against one edge can still slide
+        along it instead of grinding uselessly against the wall every
+        tick (see the seek_velocity overshoot fix for why that matters)."""
+        bound = self.world_bound
+        for organism in self.organisms:
+            x, y = organism.position
+            clamped_x = max(-bound, min(bound, x))
+            clamped_y = max(-bound, min(bound, y))
+
+            if clamped_x == x and clamped_y == y:
+                continue
+
+            vx, vy = organism.velocity
+            organism.position = (clamped_x, clamped_y)
+            organism.velocity = (0.0 if clamped_x != x else vx, 0.0 if clamped_y != y else vy)

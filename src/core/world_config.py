@@ -17,6 +17,7 @@ DEFAULTS = {
     "min_population_threshold": 3,     # rescue-spawn organisms at/below this
     "immigration_count": 5,            # how many to rescue-spawn at once
     "immigration_check_interval": 10.0,  # seconds between crash checks, 0 disables
+    "world_bound": None,  # edge of the playable field; None auto-derives from the spawn bounds (see World)
 }
 
 _UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')

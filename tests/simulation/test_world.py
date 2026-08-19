@@ -62,6 +62,77 @@ def test_initial_spawn_counts_toward_total_organisms(tmp_path):
     assert world.total_organisms_count == len(world.organisms) == 10
 
 
+def test_world_bound_auto_derives_from_spawn_bounds(tmp_path):
+    config = WorldConfig(path=tmp_path / "world_config.json")
+    config.data["organism_spawn_bound"] = 300.0
+    config.data["substance_spawn_bound"] = 400.0
+    config.data["world_bound"] = None
+
+    world = World(config)
+
+    assert world.world_bound == pytest.approx(400.0 * 1.5)
+
+
+def test_world_bound_respects_explicit_config_value(tmp_path):
+    config = WorldConfig(path=tmp_path / "world_config.json")
+    config.data["world_bound"] = 123.0
+
+    world = World(config)
+
+    assert world.world_bound == pytest.approx(123.0)
+
+
+def test_fixed_update_clamps_organism_position_inside_the_field():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    organism = make_organism()
+    organism.position = (world.world_bound + 500.0, 0.0)
+    organism.velocity = (50.0, 0.0)  # still heading further out
+    world.add_organism(organism)
+
+    world.fixed_update(1 / 60)
+
+    assert organism.position.x == pytest.approx(world.world_bound)
+    assert organism.velocity.x == 0.0  # outward component killed
+
+
+def test_fixed_update_does_not_touch_organisms_inside_the_field():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    organism = make_organism()
+    organism.position = (0.0, 0.0)
+    organism.velocity = (10.0, 5.0)
+    world.add_organism(organism)
+
+    world.fixed_update(1 / 60)
+
+    # normal physics integration moved it a little, nothing was clamped
+    assert abs(organism.position.x) < world.world_bound
+    assert abs(organism.position.y) < world.world_bound
+    assert organism.velocity.x == pytest.approx(10.0)
+    assert organism.velocity.y == pytest.approx(5.0)
+
+
+def test_clamp_only_zeroes_the_axis_that_was_out_of_bounds():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+
+    organism = make_organism()
+    organism.position = (world.world_bound + 500.0, 10.0)
+    organism.velocity = (50.0, 5.0)
+    world.add_organism(organism)
+
+    world.fixed_update(1 / 60)
+
+    assert organism.velocity.x == 0.0
+    assert organism.velocity.y == pytest.approx(5.0)  # untouched, y was in-bounds
+
+
 def test_world_respects_custom_config(tmp_path):
     config = WorldConfig(path=tmp_path / "world_config.json")
     config.data["initial_organism_count"] = 3

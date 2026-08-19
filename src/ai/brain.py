@@ -52,4 +52,14 @@ class Brain:
         y = random.uniform(min_radius, radius)
         y = self.organism.position.y + y * random.choice((1, -1))
 
+        if self.world:
+            # Steer wander targets back inside the field instead of
+            # relying only on World's hard position clamp - keeps
+            # organisms near an edge actually wandering, rather than
+            # picking outward targets they immediately get clipped back
+            # from every tick.
+            bound = self.world.world_bound
+            x = max(-bound, min(bound, x))
+            y = max(-bound, min(bound, y))
+
         self.add_task(WaypointTask((x, y), self.organism))

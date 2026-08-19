@@ -93,3 +93,23 @@ def test_does_not_restart_the_same_goal_task_every_tick(tmp_path):
 
     organism.brain.update()
     assert organism.brain.tasks[0] is first_task
+
+
+def test_wander_target_is_clamped_inside_the_world_bound(tmp_path):
+    """Regression target: near an edge, an unclamped wander target could
+    aim further out, immediately get clipped back by World's hard bound
+    clamp, and repeat every tick - grinding uselessly against the wall
+    instead of actually wandering."""
+    world = make_empty_world(tmp_path)
+    organism = make_organism(energy_ratio=1.0, fertile=False)
+    organism.wander_radius = 500.0
+    organism.position = (world.world_bound - 10.0, 0.0)
+    world.add_organism(organism)
+
+    for _ in range(50):
+        organism.brain.tasks.clear()
+        organism.brain.update()
+        task = organism.brain.tasks[0]
+        assert isinstance(task, WaypointTask)
+        assert -world.world_bound <= task.waypoint[0] <= world.world_bound
+        assert -world.world_bound <= task.waypoint[1] <= world.world_bound
