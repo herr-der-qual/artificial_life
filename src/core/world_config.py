@@ -11,6 +11,9 @@ DEFAULTS = {
     "initial_substance_count": 50,
     "organism_spawn_bound": 300.0,
     "substance_spawn_bound": 400.0,
+    "food_spawn_interval": 5.0,   # seconds between food trickle spawns, 0 disables
+    "food_spawn_count": 3,        # substances spawned per trickle
+    "max_substance_count": 150,   # soft cap so the trickle can't grow unbounded
 }
 
 _UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')

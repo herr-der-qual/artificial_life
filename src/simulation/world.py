@@ -33,6 +33,7 @@ class World:
         self.births_count = 0
         self.food_eaten_count = 0
         self.max_generation_reached = 0
+        self.food_spawn_timer = 0.0
 
         organism_bound = self.config.get("organism_spawn_bound")
         for _ in range(self.config.get("initial_organism_count")):
@@ -72,6 +73,11 @@ class World:
         substance = next((s for s in self.substances if s == substance_body), None)
 
         if organism and substance and organism.is_alive:
+            if substance.kind not in organism.diet:
+                # Evolved dietary preference: the organism won't touch this
+                # kind of food at all - just leave it be.
+                return False
+
             energy_gained = organism.digest(substance.matter)
             organism.energy = min(organism.energy + energy_gained, organism.max_energy)
 
@@ -105,7 +111,9 @@ class World:
             product_matter = Matter()
             product_matter.add_molecule(product)
 
-            new_substance = Substance(product_matter, color=SubstanceFactory.color_for(product_matter))
+            new_substance = Substance(
+                product_matter, color=SubstanceFactory.color_for(product_matter), kind="reaction_product",
+            )
             new_substance.position = position
             self.add_substance(new_substance)
 
@@ -132,7 +140,9 @@ class World:
             self.space.remove(organism, organism.shape)
 
     def convert_organism_to_substance(self, organism):
-        corpse = Substance(organism.matter, color=(150, 150, 150), body_type=pymunk.Body.STATIC)
+        corpse = Substance(
+            organism.matter, color=(150, 150, 150), body_type=pymunk.Body.STATIC, kind="corpse",
+        )
         corpse.position = organism.position
         corpse.shape.collision_type = 1
 
@@ -148,6 +158,29 @@ class World:
             self.add_substance(corpse)
             self.remove_organism(organism)
             self.deaths_count += 1
+
+        self._spawn_food_over_time(delta_time)
+
+    def _spawn_food_over_time(self, delta_time):
+        interval = self.config.get("food_spawn_interval")
+        if not interval or interval <= 0:
+            return
+
+        max_substances = self.config.get("max_substance_count")
+        if max_substances and len(self.substances) >= max_substances:
+            return
+
+        self.food_spawn_timer += delta_time
+        if self.food_spawn_timer < interval:
+            return
+        self.food_spawn_timer -= interval
+
+        bound = self.config.get("substance_spawn_bound")
+        for _ in range(self.config.get("food_spawn_count")):
+            if max_substances and len(self.substances) >= max_substances:
+                break
+            substance = SubstanceFactory.spawn_random_in_bounds(-bound, bound, -bound, bound)
+            self.add_substance(substance)
 
     def fixed_update(self, delta_time):
         self.space.step(0.1)

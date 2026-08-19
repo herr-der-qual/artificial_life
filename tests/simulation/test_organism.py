@@ -4,13 +4,15 @@ from simulation.elements import Elements
 from simulation.genome import Genome
 from simulation.matter import Matter
 from simulation.organism import Organism
+from simulation.substance import FOOD_KINDS
 from core.molecule_factory import MoleculeFactory
 
 
 def make_simple_organism(**genome_overrides):
     defaults = dict(
         speed=30.0, max_energy=100.0, energy_drain_rate=10.0,
-        search_radius=200.0, color=(0, 255, 0),
+        search_radius=200.0, wander_radius=50.0, diet=frozenset(FOOD_KINDS),
+        color=(0, 255, 0),
     )
     defaults.update(genome_overrides)
     genome = Genome(**defaults)
@@ -31,8 +33,18 @@ def test_search_radius_comes_from_genome():
     assert organism.search_radius == 123.0
 
 
+def test_wander_radius_and_diet_come_from_genome():
+    diet = frozenset({"basic", "simple"})
+    organism = make_simple_organism(wander_radius=77.0, diet=diet)
+    assert organism.wander_radius == 77.0
+    assert organism.diet == diet
+
+
 def test_starting_energy_can_be_overridden():
-    genome = Genome(speed=30, max_energy=100, energy_drain_rate=10, search_radius=200, color=(0, 255, 0))
+    genome = Genome(
+        speed=30, max_energy=100, energy_drain_rate=10, search_radius=200,
+        wander_radius=50, diet=frozenset(FOOD_KINDS), color=(0, 255, 0),
+    )
     matter = Matter()
     matter.add_molecule(MoleculeFactory.random_molecule([Elements.C], 2))
 

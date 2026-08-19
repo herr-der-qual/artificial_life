@@ -6,10 +6,14 @@ from simulation.elements import Elements
 from simulation.genome import Genome
 from simulation.matter import Matter
 from simulation.organism import Organism
+from simulation.substance import FOOD_KINDS
 
 
 def make_fertile_organism(x=0.0, y=0.0):
-    genome = Genome(speed=30.0, max_energy=200.0, energy_drain_rate=10.0, search_radius=200.0, color=(0, 255, 0))
+    genome = Genome(
+        speed=30.0, max_energy=200.0, energy_drain_rate=10.0, search_radius=200.0,
+        wander_radius=50.0, diet=frozenset(FOOD_KINDS), color=(0, 255, 0),
+    )
     matter = Matter()
     matter.add_molecule(MoleculeFactory.random_molecule([Elements.C], 2))
 
@@ -79,8 +83,14 @@ def test_create_offspring_positions_child_at_parents_midpoint():
 def test_create_offspring_inherits_traits_from_one_of_the_parents_lineage():
     a = make_fertile_organism()
     b = make_fertile_organism()
-    a.genome = Genome(speed=10.0, max_energy=200.0, energy_drain_rate=5.0, search_radius=200.0, color=(0, 0, 0))
-    b.genome = Genome(speed=90.0, max_energy=200.0, energy_drain_rate=25.0, search_radius=200.0, color=(255, 255, 255))
+    a.genome = Genome(
+        speed=10.0, max_energy=200.0, energy_drain_rate=5.0, search_radius=200.0,
+        wander_radius=50.0, diet=frozenset(FOOD_KINDS), color=(0, 0, 0),
+    )
+    b.genome = Genome(
+        speed=90.0, max_energy=200.0, energy_drain_rate=25.0, search_radius=200.0,
+        wander_radius=50.0, diet=frozenset(FOOD_KINDS), color=(255, 255, 255),
+    )
 
     child = OrganismFactory.create_offspring(a, b)
 

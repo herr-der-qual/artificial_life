@@ -8,7 +8,9 @@ from core.molecule_factory import MoleculeFactory
 
 
 class SubstanceFactory:
-    """Factory for creating food substances with different compositions"""
+    """Factory for creating food substances with different compositions.
+    All food is shades of blue, so it reads clearly against the warmer
+    organism palette (Genome.random() colors)."""
 
     @staticmethod
     def create_basic():
@@ -16,8 +18,7 @@ class SubstanceFactory:
         matter = Matter()
         matter.add_molecule(MoleculeFactory.co2())
 
-        substance = Substance(matter, color=(255, 200, 0))
-        return substance
+        return Substance(matter, color=(70, 130, 220), kind="basic")
 
     @staticmethod
     def create_rich():
@@ -25,8 +26,7 @@ class SubstanceFactory:
         matter = Matter()
         matter.add_molecule(MoleculeFactory.simple_organic())
 
-        substance = Substance(matter, color=(255, 150, 0))
-        return substance
+        return Substance(matter, color=(20, 60, 160), kind="rich")
 
     @staticmethod
     def create_simple():
@@ -34,8 +34,7 @@ class SubstanceFactory:
         matter = Matter()
         matter.add_molecule(MoleculeFactory.water())
 
-        substance = Substance(matter, color=(255, 255, 0))
-        return substance
+        return Substance(matter, color=(120, 190, 255), kind="simple")
 
     @staticmethod
     def create_random():
@@ -72,20 +71,21 @@ class SubstanceFactory:
         return SubstanceFactory.spawn_at_position(substance_type, x, y)
 
     ELEMENT_COLORS = {
-        Elements.C: (180, 120, 60),
-        Elements.O: (255, 100, 100),
-        Elements.H: (200, 200, 255),
-        Elements.N: (150, 150, 255),
-        Elements.S: (230, 230, 0),
-        Elements.P: (255, 150, 200),
+        Elements.C: (40, 90, 190),
+        Elements.O: (90, 150, 230),
+        Elements.H: (140, 200, 255),
+        Elements.N: (60, 110, 210),
+        Elements.S: (30, 70, 170),
+        Elements.P: (100, 170, 240),
     }
 
     @staticmethod
     def color_for(matter: Matter):
         """Derive a display color from a matter's dominant element - used for
-        substances produced by a reaction rather than a fixed recipe."""
+        substances produced by a reaction rather than a fixed recipe. Still
+        blue-family, to read as food."""
         if not matter.molecules:
-            return (200, 200, 200)
+            return (100, 150, 220)
 
         counts = {}
         for molecule in matter.molecules:
@@ -93,4 +93,4 @@ class SubstanceFactory:
                 counts[element] = counts.get(element, 0) + count
 
         dominant = max(counts.items(), key=lambda kv: kv[1])[0]
-        return SubstanceFactory.ELEMENT_COLORS.get(dominant, (200, 200, 200))
+        return SubstanceFactory.ELEMENT_COLORS.get(dominant, (100, 150, 220))

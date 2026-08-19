@@ -17,8 +17,12 @@ class SeekFoodTask(Task):
 
         nearest = None
         min_distance = float('inf')
+        diet = self.organism.diet
 
         for substance in self.world.substances:
+            if substance.kind not in diet:
+                continue
+
             distance = (substance.position - self.organism.position).length
 
             # Only consider food within search radius

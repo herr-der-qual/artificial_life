@@ -93,6 +93,12 @@ class ControlPanel:
         self.settings.set("target_fps", "infinite" if fps == math.inf else fps)
 
     def _on_pause_click(self, event):
+        self.toggle_pause()
+
+    def toggle_pause(self):
+        """Shared by the Pause button and any other trigger (e.g. a
+        middle-mouse-button shortcut) so the button label and settings
+        always stay in sync with however playback got toggled."""
         self.runner.toggle_pause()
         self._refresh_pause_button()
         self.settings.set("paused", self.runner.paused)

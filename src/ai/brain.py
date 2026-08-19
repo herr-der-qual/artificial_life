@@ -45,7 +45,7 @@ class Brain:
 
     def generate_task(self):
         min_radius = 5
-        radius = 30
+        radius = max(min_radius, self.organism.wander_radius)
         x = random.uniform(min_radius, radius)
         x = self.organism.position.x + x * random.choice((1, -1))
 

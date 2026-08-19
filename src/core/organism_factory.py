@@ -7,6 +7,7 @@ from simulation.matter import Matter
 from simulation.elements import Elements
 from simulation.organism import Organism
 from simulation.reactor import Reactor
+from simulation.substance import FOOD_KINDS
 
 
 class OrganismFactory:
@@ -44,7 +45,10 @@ class OrganismFactory:
 
     @staticmethod
     def create_basic():
-        genome = Genome(speed=30, max_energy=100, energy_drain_rate=10, search_radius=200, color=(255, 255, 0))
+        genome = Genome(
+            speed=30, max_energy=100, energy_drain_rate=10, search_radius=200,
+            wander_radius=30, diet=frozenset(FOOD_KINDS), color=(255, 255, 0),
+        )
 
         matter = Matter()
         matter.add_molecule(MoleculeFactory.random_molecule([Elements.C], 3))
@@ -82,9 +86,13 @@ class OrganismFactory:
             matter.add_molecule(product)
 
         genome = parent_a.genome.crossover(parent_b.genome).mutate()
+        # Start at a healthy fraction of the child's OWN max_energy (plus any
+        # exothermic bonus from combining the parents' reserves) rather than
+        # a fixed absolute amount - otherwise a high-max_energy child is born
+        # already under the hunger threshold no matter what.
         starting_energy = min(
             genome.max_energy,
-            Organism.REPRODUCE_ENERGY_COST + max(0.0, result.energy_delta),
+            genome.max_energy * 0.6 + max(0.0, result.energy_delta),
         )
         generation = max(parent_a.generation, parent_b.generation) + 1
 

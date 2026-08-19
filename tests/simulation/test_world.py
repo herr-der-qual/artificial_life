@@ -4,7 +4,7 @@ from simulation.elements import Elements
 from simulation.genome import Genome
 from simulation.matter import Matter
 from simulation.organism import Organism
-from simulation.substance import Substance
+from simulation.substance import Substance, FOOD_KINDS
 from simulation.world import World
 
 
@@ -21,7 +21,8 @@ class FakeArbiter:
 
 def make_organism(x=0.0, y=0.0, max_energy=200.0, fertile=False):
     genome = Genome(speed=30.0, max_energy=max_energy, energy_drain_rate=10.0,
-                     search_radius=200.0, color=(0, 255, 0))
+                     search_radius=200.0, wander_radius=50.0, diet=frozenset(FOOD_KINDS),
+                     color=(0, 255, 0))
     matter = Matter()
     matter.add_molecule(MoleculeFactory.random_molecule([Elements.C], 2))
 
@@ -41,7 +42,7 @@ def make_organism(x=0.0, y=0.0, max_energy=200.0, fertile=False):
 def make_food():
     matter = Matter()
     matter.add_molecule(MoleculeFactory.water())
-    return Substance(matter, color=(255, 255, 0))
+    return Substance(matter, color=(255, 255, 0), kind="simple")
 
 
 def test_initial_spawn_counts_toward_total_organisms(tmp_path):
@@ -112,6 +113,73 @@ def test_food_eaten_count_increments_on_eat_collision():
 
     assert world.food_eaten_count == 1
     assert food not in world.substances
+
+
+def test_eat_collision_is_ignored_when_food_kind_is_outside_diet():
+    world = World()
+    for organism in list(world.organisms):
+        world.remove_organism(organism)
+    for substance in list(world.substances):
+        world.remove_substance(substance)
+
+    organism = make_organism()
+    organism.diet = frozenset({"rich"})  # water ("simple") is not in the diet
+    world.add_organism(organism)
+
+    food = make_food()
+    world.add_substance(food)
+
+    arbiter = FakeArbiter(
+        FakeShape(organism, collision_type=2),
+        FakeShape(food, collision_type=1),
+    )
+    world.on_organism_eat_substance(arbiter, None, None)
+
+    assert world.food_eaten_count == 0
+    assert food in world.substances
+
+
+def test_food_spawns_over_time(tmp_path):
+    config = WorldConfig(path=tmp_path / "world_config.json")
+    config.data["initial_organism_count"] = 0
+    config.data["initial_substance_count"] = 0
+    config.data["food_spawn_interval"] = 1.0
+    config.data["food_spawn_count"] = 4
+
+    world = World(config)
+    assert len(world.substances) == 0
+
+    world.update(0.5)
+    assert len(world.substances) == 0  # interval hasn't elapsed yet
+
+    world.update(0.6)
+    assert len(world.substances) == 4
+
+
+def test_food_spawn_respects_max_substance_count(tmp_path):
+    config = WorldConfig(path=tmp_path / "world_config.json")
+    config.data["initial_organism_count"] = 0
+    config.data["initial_substance_count"] = 0
+    config.data["food_spawn_interval"] = 1.0
+    config.data["food_spawn_count"] = 10
+    config.data["max_substance_count"] = 3
+
+    world = World(config)
+    world.update(1.5)
+
+    assert len(world.substances) == 3
+
+
+def test_food_spawn_disabled_when_interval_is_zero(tmp_path):
+    config = WorldConfig(path=tmp_path / "world_config.json")
+    config.data["initial_organism_count"] = 0
+    config.data["initial_substance_count"] = 0
+    config.data["food_spawn_interval"] = 0
+
+    world = World(config)
+    world.update(100.0)
+
+    assert len(world.substances) == 0
 
 
 def test_reproduction_updates_births_total_and_generation_counters():

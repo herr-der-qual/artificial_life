@@ -110,6 +110,10 @@ class WorldView(arcade.View):
     def on_key_release(self, key, modifiers):
         self.camera.on_key_release(key, modifiers)
 
+    def on_mouse_press(self, x, y, button, modifiers):
+        if button == arcade.MOUSE_BUTTON_MIDDLE:
+            self.control_panel.toggle_pause()
+
     def on_mouse_drag(self, *args):
         self.camera.on_mouse_drag(*args)
 
