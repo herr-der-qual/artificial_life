@@ -9,6 +9,7 @@ DEFAULTS = {
     "paused": False,
     "step_n": 10,
     "stats_panel_open": False,
+    "ui_hidden": False,
 }
 
 FLUSH_INTERVAL = 0.5  # seconds - avoids hammering disk while a slider is being dragged

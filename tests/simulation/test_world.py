@@ -1,4 +1,5 @@
 from core.molecule_factory import MoleculeFactory
+from core.world_config import WorldConfig
 from simulation.elements import Elements
 from simulation.genome import Genome
 from simulation.matter import Matter
@@ -43,9 +44,24 @@ def make_food():
     return Substance(matter, color=(255, 255, 0))
 
 
-def test_initial_spawn_counts_toward_total_organisms():
-    world = World()
+def test_initial_spawn_counts_toward_total_organisms(tmp_path):
+    world = World(WorldConfig(path=tmp_path / "world_config.json"))
     assert world.total_organisms_count == len(world.organisms) == 10
+
+
+def test_world_respects_custom_config(tmp_path):
+    config = WorldConfig(path=tmp_path / "world_config.json")
+    config.data["initial_organism_count"] = 3
+    config.data["initial_substance_count"] = 7
+    config.data["organism_spawn_bound"] = 50.0
+    config.data["substance_spawn_bound"] = 60.0
+
+    world = World(config)
+
+    assert len(world.organisms) == 3
+    assert len(world.substances) == 7
+    assert all(abs(o.position.x) <= 50.0 and abs(o.position.y) <= 50.0 for o in world.organisms)
+    assert all(abs(s.position.x) <= 60.0 and abs(s.position.y) <= 60.0 for s in world.substances)
 
 
 def test_add_organism_increments_total_but_not_alive_only_counters():

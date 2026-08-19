@@ -2,13 +2,16 @@ import pymunk
 
 from core.organism_factory import OrganismFactory
 from core.substance_factory import SubstanceFactory
+from core.world_config import WorldConfig
 from simulation.substance import Substance
 from simulation.matter import Matter
 from simulation.reactor import Reactor
 
 
 class World:
-    def __init__(self):
+    def __init__(self, config: WorldConfig = None):
+        self.config = config or WorldConfig()
+
         self.space = pymunk.Space()
         self.space.gravity = (0, 0)
         self.space.use_spatial_hash(10, 10000)
@@ -31,13 +34,17 @@ class World:
         self.food_eaten_count = 0
         self.max_generation_reached = 0
 
-        for _ in range(10):
-            organism = OrganismFactory.create_random()
+        organism_bound = self.config.get("organism_spawn_bound")
+        for _ in range(self.config.get("initial_organism_count")):
+            organism = OrganismFactory.create_random(bound=organism_bound)
             self.add_organism(organism)
 
         # Spawn initial food substances
-        for _ in range(50):
-            substance = SubstanceFactory.spawn_random_in_bounds()
+        substance_bound = self.config.get("substance_spawn_bound")
+        for _ in range(self.config.get("initial_substance_count")):
+            substance = SubstanceFactory.spawn_random_in_bounds(
+                -substance_bound, substance_bound, -substance_bound, substance_bound,
+            )
             self.add_substance(substance)
 
     def on_organism_collision(self, arbiter, space, data):

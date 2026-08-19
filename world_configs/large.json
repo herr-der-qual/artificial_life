@@ -1,0 +1,6 @@
+{
+  "initial_organism_count": 40,
+  "initial_substance_count": 150,
+  "organism_spawn_bound": 600.0,
+  "substance_spawn_bound": 700.0
+}

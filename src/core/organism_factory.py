@@ -24,15 +24,15 @@ class OrganismFactory:
         pass
 
     @staticmethod
-    def create_random():
+    def create_random(bound: float = 300.0):
         genome = Genome.random()
 
         matter = Matter()
         num_atoms = random.randint(2, 6)
         matter.add_molecule(MoleculeFactory.random_molecule(OrganismFactory.BODY_ELEMENTS, num_atoms))
 
-        x = random.uniform(-300, 300)
-        y = random.uniform(-300, 300)
+        x = random.uniform(-bound, bound)
+        y = random.uniform(-bound, bound)
 
         return (
             OrganismBuilder()

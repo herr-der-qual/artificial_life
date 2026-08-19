@@ -325,3 +325,4 @@ $RECYCLE.BIN/
 
 /.claude/settings.local.json
 /settings.json
+/world_config.json
