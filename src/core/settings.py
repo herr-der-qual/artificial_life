@@ -8,6 +8,7 @@ DEFAULTS = {
     "target_fps": 60,       # number, or "infinite" for uncapped speed
     "paused": False,
     "step_n": 10,
+    "stats_panel_open": False,
 }
 
 FLUSH_INTERVAL = 0.5  # seconds - avoids hammering disk while a slider is being dragged

@@ -25,6 +25,12 @@ class World:
         self.organisms = []
         self.substances = []
 
+        self.total_organisms_count = 0
+        self.deaths_count = 0
+        self.births_count = 0
+        self.food_eaten_count = 0
+        self.max_generation_reached = 0
+
         for _ in range(10):
             organism = OrganismFactory.create_random()
             self.add_organism(organism)
@@ -44,6 +50,8 @@ class World:
             child = OrganismFactory.create_offspring(organism_a, organism_b)
             if child:
                 self.add_organism(child)
+                self.births_count += 1
+                self.max_generation_reached = max(self.max_generation_reached, child.generation)
 
         return True
 
@@ -61,6 +69,7 @@ class World:
             organism.energy = min(organism.energy + energy_gained, organism.max_energy)
 
             self.remove_substance(substance)
+            self.food_eaten_count += 1
 
         return False
 
@@ -99,6 +108,7 @@ class World:
         self.organisms.append(organism)
         self.space.add(organism, organism.shape)
         organism.brain.world = self
+        self.total_organisms_count += 1
 
     def add_substance(self, substance):
         self.substances.append(substance)
@@ -130,6 +140,7 @@ class World:
             corpse = self.convert_organism_to_substance(organism)
             self.add_substance(corpse)
             self.remove_organism(organism)
+            self.deaths_count += 1
 
     def fixed_update(self, delta_time):
         self.space.step(0.1)

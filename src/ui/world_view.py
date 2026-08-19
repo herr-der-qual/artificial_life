@@ -8,6 +8,7 @@ from simulation.world import World
 from .camera import Camera
 from .renderer import Renderer
 from .control_panel import ControlPanel
+from .stats_panel import StatsPanel
 
 
 class WorldView(arcade.View):
@@ -32,12 +33,16 @@ class WorldView(arcade.View):
         self.runner.start()
 
         self.control_panel = ControlPanel(self.runner, self.settings)
+        self.stats_panel = StatsPanel(self.world)
+        self.stats_panel.is_open = self.settings.get("stats_panel_open")
 
     def on_show_view(self):
         self.control_panel.enable()
+        self.stats_panel.enable()
 
     def on_hide_view(self):
         self.control_panel.disable()
+        self.stats_panel.disable()
 
     def on_draw(self):
         self.clear()
@@ -49,10 +54,13 @@ class WorldView(arcade.View):
         self.renderer.render(self.world.organisms + self.world.substances)
 
         self.control_panel.draw()
+        self.stats_panel.draw()
 
     def on_update(self, delta_time):
         self.camera.update()
         self.control_panel.on_update(delta_time)
+        self.stats_panel.on_update(delta_time)
+        self.settings.set("stats_panel_open", self.stats_panel.is_open)
 
     def on_key_press(self, key, modifiers):
         self.camera.on_key_press(key, modifiers)

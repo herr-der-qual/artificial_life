@@ -86,6 +86,7 @@ class OrganismFactory:
             genome.max_energy,
             Organism.REPRODUCE_ENERGY_COST + max(0.0, result.energy_delta),
         )
+        generation = max(parent_a.generation, parent_b.generation) + 1
 
         midpoint = (
             (parent_a.position.x + parent_b.position.x) / 2,
@@ -98,6 +99,7 @@ class OrganismFactory:
                 .set_genome(genome)
                 .set_matter(matter)
                 .set_starting_energy(starting_energy)
+                .set_generation(generation)
                 .build()
         )
 

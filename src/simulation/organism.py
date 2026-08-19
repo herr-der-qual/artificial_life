@@ -13,7 +13,7 @@ class Organism(Substance):
     REPRODUCE_MATTER_THRESHOLD = 40.0
     REPRODUCE_COOLDOWN = 10.0
 
-    def __init__(self, matter: Matter, genome: Genome, starting_energy: float = None):
+    def __init__(self, matter: Matter, genome: Genome, starting_energy: float = None, generation: int = 0):
         super().__init__(matter, genome.color, body_type=pymunk.Body.KINEMATIC)
 
         self.genome = genome
@@ -23,6 +23,7 @@ class Organism(Substance):
         self.energy = genome.max_energy if starting_energy is None else starting_energy
         self.energy_drain_rate = genome.energy_drain_rate
         self.search_radius = genome.search_radius
+        self.generation = generation
         self.is_alive = True
         self.shape.collision_type = 2
 

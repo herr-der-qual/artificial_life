@@ -9,6 +9,7 @@ class OrganismBuilder:
         self.genome = None
         self.matter = None
         self.starting_energy = None
+        self.generation = 0
 
     def set_position(self, position):
         self.position = position
@@ -26,11 +27,16 @@ class OrganismBuilder:
         self.starting_energy = energy
         return self
 
+    def set_generation(self, generation: int):
+        self.generation = generation
+        return self
+
     def build(self) -> 'Organism':
         organism = Organism(
             matter=self.matter,
             genome=self.genome,
             starting_energy=self.starting_energy,
+            generation=self.generation,
         )
         organism.position = self.position
 
