@@ -1,28 +1,30 @@
-import pymunk
-
 from ai.tasks.seek_food_task import SeekFoodTask
 from ai.tasks.seek_mate_task import SeekMateTask
 from ai.tasks.waypoint_task import WaypointTask
 from core.molecule_factory import MoleculeFactory
+from core.world_config import WorldConfig
 from simulation.elements import Elements
 from simulation.genome import Genome
 from simulation.matter import Matter
 from simulation.organism import Organism
-from simulation.substance import FOOD_KINDS
+from simulation.substance import Substance, FOOD_KINDS
+from simulation.world import World
 
 
-class FakeSubstance:
-    """Enough of a Substance for SeekFoodTask.do() to run: a position + kind."""
+def make_empty_world(tmp_path):
+    config = WorldConfig(path=tmp_path / "world_config.json")
+    config.data["initial_organism_count"] = 0
+    config.data["initial_substance_count"] = 0
+    config.data["food_spawn_interval"] = 0
+    return World(config)
 
-    def __init__(self, x=50.0, y=50.0, kind="basic"):
-        self.position = pymunk.Vec2d(x, y)
-        self.kind = kind
 
-
-class FakeWorld:
-    def __init__(self, substances=None, organisms=None):
-        self.substances = substances if substances is not None else []
-        self.organisms = organisms if organisms is not None else []
+def make_food(x=50.0, y=50.0, kind="basic"):
+    matter = Matter()
+    matter.add_molecule(MoleculeFactory.water())
+    substance = Substance(matter, color=(0, 0, 255), kind=kind)
+    substance.position = (x, y)
+    return substance
 
 
 def make_organism(energy_ratio=1.0, fertile=False, max_energy=200.0):
@@ -45,39 +47,46 @@ def make_organism(energy_ratio=1.0, fertile=False, max_energy=200.0):
     return organism
 
 
-def test_hunger_takes_priority_over_mating():
+def test_hunger_takes_priority_over_mating(tmp_path):
+    world = make_empty_world(tmp_path)
     organism = make_organism(energy_ratio=0.1, fertile=True)
-    organism.brain.world = FakeWorld(substances=[FakeSubstance()], organisms=[organism])
+    world.add_organism(organism)
+    world.add_substance(make_food())
 
     organism.brain.update()
 
     assert isinstance(organism.brain.tasks[0], SeekFoodTask)
 
 
-def test_mating_pursued_when_not_hungry():
+def test_mating_pursued_when_not_hungry(tmp_path):
+    world = make_empty_world(tmp_path)
     organism = make_organism(energy_ratio=1.0, fertile=True)
     mate = make_organism(energy_ratio=1.0, fertile=True)
     mate.position = (50.0, 50.0)
-
-    organism.brain.world = FakeWorld(substances=[FakeSubstance()], organisms=[organism, mate])
+    world.add_organism(organism)
+    world.add_organism(mate)
+    world.add_substance(make_food())
 
     organism.brain.update()
 
     assert isinstance(organism.brain.tasks[0], SeekMateTask)
 
 
-def test_wanders_when_no_goal_is_active():
+def test_wanders_when_no_goal_is_active(tmp_path):
+    world = make_empty_world(tmp_path)
     organism = make_organism(energy_ratio=1.0, fertile=False)
-    organism.brain.world = FakeWorld(substances=[], organisms=[])
+    world.add_organism(organism)
 
     organism.brain.update()
 
     assert isinstance(organism.brain.tasks[0], WaypointTask)
 
 
-def test_does_not_restart_the_same_goal_task_every_tick():
+def test_does_not_restart_the_same_goal_task_every_tick(tmp_path):
+    world = make_empty_world(tmp_path)
     organism = make_organism(energy_ratio=0.1, fertile=False)
-    organism.brain.world = FakeWorld(substances=[FakeSubstance()], organisms=[])
+    world.add_organism(organism)
+    world.add_substance(make_food())
 
     organism.brain.update()
     first_task = organism.brain.tasks[0]

@@ -17,3 +17,6 @@ class Substance(pymunk.Body):
         self.matter = matter
         self.color = color
         self.kind = kind
+        # Cheap O(1) "is this still in the world" check for tasks caching a
+        # target across frames, instead of an O(n) `in world.substances`.
+        self.removed = False

@@ -13,23 +13,32 @@ class SeekMateTask(Task):
         self.target_mate = None
 
     def find_nearest_mate(self):
+        """Uses the space's spatial index instead of scanning every
+        organism in Python - see SeekFoodTask.find_nearest_food."""
+        results = self.world.space.point_query(
+            self.organism.position, self.organism.search_radius, pymunk.ShapeFilter(),
+        )
+
         nearest = None
         min_distance = float('inf')
 
-        for other in self.world.organisms:
+        for info in results:
+            shape = info.shape
+            if shape.collision_type != 2:
+                continue
+
+            other = shape.body
             if other is self.organism or not other.can_reproduce():
                 continue
 
-            distance = (other.position - self.organism.position).length
-            if distance < self.organism.search_radius and distance < min_distance:
-                min_distance = distance
+            if info.distance < min_distance:
+                min_distance = info.distance
                 nearest = other
 
         return nearest
 
     def do(self):
-        if self.target_mate is None or self.target_mate not in self.world.organisms \
-                or not self.target_mate.can_reproduce():
+        if self.target_mate is None or self.target_mate.removed or not self.target_mate.can_reproduce():
             self.target_mate = self.find_nearest_mate()
 
         if self.target_mate is None:

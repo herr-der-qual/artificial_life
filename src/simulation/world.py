@@ -1,3 +1,5 @@
+import math
+
 import pymunk
 
 from core.organism_factory import OrganismFactory
@@ -8,13 +10,37 @@ from simulation.matter import Matter
 from simulation.reactor import Reactor
 
 
+def grid_position(index: int, count: int, bound: float) -> tuple:
+    """Position `index` (0-based) of `count` evenly-spaced points on a
+    square grid filling [-bound, bound]^2. Used to spawn organisms without
+    overlap - random placement can stack many of them on top of each other
+    at high counts, causing a burst of spurious collisions (and even
+    reproductions) in the very first physics step."""
+    columns = math.ceil(math.sqrt(count))
+    rows = math.ceil(count / columns)
+
+    col = index % columns
+    row = index // columns
+
+    cell_width = (2 * bound) / columns
+    cell_height = (2 * bound) / rows
+
+    x = -bound + (col + 0.5) * cell_width
+    y = -bound + (row + 0.5) * cell_height
+    return x, y
+
+
 class World:
     def __init__(self, config: WorldConfig = None):
         self.config = config or WorldConfig()
 
         self.space = pymunk.Space()
         self.space.gravity = (0, 0)
-        self.space.use_spatial_hash(10, 10000)
+        # Was use_spatial_hash(10, 10000) - a fixed cell size tuned for one
+        # density. Our configs span wildly different scales (bound 300 to
+        # 6000+, thousands of entities packed tight or spread out), so a
+        # fixed grid is well-tuned for at most one of them. pymunk's default
+        # BB-tree adapts to whatever density is actually there instead.
 
         handler = self.space.add_collision_handler(2, 2)
         handler.begin = self.on_organism_collision
@@ -36,8 +62,10 @@ class World:
         self.food_spawn_timer = 0.0
 
         organism_bound = self.config.get("organism_spawn_bound")
-        for _ in range(self.config.get("initial_organism_count")):
+        organism_count = self.config.get("initial_organism_count")
+        for i in range(organism_count):
             organism = OrganismFactory.create_random(bound=organism_bound)
+            organism.position = grid_position(i, organism_count, organism_bound)
             self.add_organism(organism)
 
         # Spawn initial food substances
@@ -51,10 +79,13 @@ class World:
     def on_organism_collision(self, arbiter, space, data):
         shape1, shape2 = arbiter.shapes
 
-        organism_a = next((o for o in self.organisms if o == shape1.body), None)
-        organism_b = next((o for o in self.organisms if o == shape2.body), None)
+        # shape.body IS the Organism (Organism subclasses pymunk.Body) - no
+        # need to search self.organisms for it, that was an O(n) scan on
+        # every single collision and dominates at a few hundred+ organisms.
+        organism_a = shape1.body
+        organism_b = shape2.body
 
-        if organism_a and organism_b and organism_a.can_reproduce() and organism_b.can_reproduce():
+        if organism_a.can_reproduce() and organism_b.can_reproduce():
             child = OrganismFactory.create_offspring(organism_a, organism_b)
             if child:
                 self.add_organism(child)
@@ -66,13 +97,18 @@ class World:
     def on_organism_eat_substance(self, arbiter, space, data):
         shape1, shape2 = arbiter.shapes
 
-        organism_body = shape1.body if shape1.collision_type == 2 else shape2.body
-        substance_body = shape2.body if shape2.collision_type == 1 else shape1.body
+        organism = shape1.body if shape1.collision_type == 2 else shape2.body
+        substance = shape2.body if shape2.collision_type == 1 else shape1.body
 
-        organism = next((o for o in self.organisms if o == organism_body), None)
-        substance = next((s for s in self.substances if s == substance_body), None)
+        # At high density the same substance can be hit by more than one
+        # collision `begin` callback within a single physics step, before
+        # its removal actually takes effect - without this guard it gets
+        # digested twice, and the second pass tries to break bonds already
+        # broken by the first (ValueError: list.remove(x): x not in list).
+        if substance.removed:
+            return False
 
-        if organism and substance and organism.is_alive:
+        if organism.is_alive:
             if substance.kind not in organism.diet:
                 # Evolved dietary preference: the organism won't touch this
                 # kind of food at all - just leave it be.
@@ -89,10 +125,12 @@ class World:
     def on_substance_collision(self, arbiter, space, data):
         shape1, shape2 = arbiter.shapes
 
-        substance_a = next((s for s in self.substances if s == shape1.body), None)
-        substance_b = next((s for s in self.substances if s == shape2.body), None)
+        substance_a = shape1.body
+        substance_b = shape2.body
 
-        if not substance_a or not substance_b or substance_a is substance_b:
+        # Same double-processing hazard as on_organism_eat_substance: either
+        # side may have already reacted away in another callback this step.
+        if substance_a is substance_b or substance_a.removed or substance_b.removed:
             return True
 
         molecules = substance_a.matter.molecules + substance_b.matter.molecules
@@ -133,11 +171,13 @@ class World:
         if substance in self.substances:
             self.substances.remove(substance)
             self.space.remove(substance, substance.shape)
+            substance.removed = True
 
     def remove_organism(self, organism):
         if organism in self.organisms:
             self.organisms.remove(organism)
             self.space.remove(organism, organism.shape)
+            organism.removed = True
 
     def convert_organism_to_substance(self, organism):
         corpse = Substance(

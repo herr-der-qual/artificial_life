@@ -11,23 +11,32 @@ class SeekFoodTask(Task):
         self.target_food = None
 
     def find_nearest_food(self):
-        """Find the nearest substance within search radius"""
-        if not self.world.substances:
-            return None
+        """Find the nearest substance within search radius.
+
+        Uses the space's own spatial index (space.point_query) instead of
+        scanning every substance in Python - with hundreds of organisms all
+        hungry at once, a per-organism O(n) scan over every substance
+        multiplies into millions of distance checks a second.
+        """
+        diet = self.organism.diet
+        results = self.world.space.point_query(
+            self.organism.position, self.organism.search_radius, pymunk.ShapeFilter(),
+        )
 
         nearest = None
         min_distance = float('inf')
-        diet = self.organism.diet
 
-        for substance in self.world.substances:
+        for info in results:
+            shape = info.shape
+            if shape.collision_type != 1:
+                continue
+
+            substance = shape.body
             if substance.kind not in diet:
                 continue
 
-            distance = (substance.position - self.organism.position).length
-
-            # Only consider food within search radius
-            if distance < self.organism.search_radius and distance < min_distance:
-                min_distance = distance
+            if info.distance < min_distance:
+                min_distance = info.distance
                 nearest = substance
 
         return nearest
@@ -39,7 +48,7 @@ class SeekFoodTask(Task):
             return True
 
         # Find or update target
-        if self.target_food is None or self.target_food not in self.world.substances:
+        if self.target_food is None or self.target_food.removed:
             self.target_food = self.find_nearest_food()
 
         # No food found within range
