@@ -17,12 +17,10 @@ class Substance(pymunk.Body):
                  scale: float = 1.0):
         super().__init__(matter.mass, 1, body_type)
 
-        # Body shape is literally built from the matter it's made of - one
-        # cell-triangle per molecule, hulled into a single convex polygon
-        # (pymunk.Poly requires convex) - not just a uniformly scaled
-        # triangle. A 1-molecule body (most food, a freshly-random
-        # organism) reduces to exactly the original triangle.
-        vertices = body_hull(len(matter.molecules), scale)
+        # Body shape is a convex hull (pymunk.Poly requires convex) around
+        # the body's actual atoms, not a uniformly scaled placeholder - see
+        # body_geometry.body_hull.
+        vertices = body_hull(matter.molecules, scale)
         self.shape = pymunk.Poly(self, vertices)
         self.shape.collision_type = 1
         self.matter = matter

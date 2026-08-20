@@ -5,17 +5,8 @@ import math
 # each other.
 GOLDEN_ANGLE = math.pi * (3 - math.sqrt(5))
 
-# Matches the single-cell triangle silhouette this project has always used -
-# a multicellular body is built from copies of the same triangle, not a
-# different base shape, so a cell_count of 1 renders/collides pixel-for-
-# pixel identical to what it always was.
-CELL_TRIANGLE = ((-4.0, -4.0), (0.0, 4.0), (4.0, -4.0))
-CELL_SPACING = 4.0  # world units between successive cells in the spiral
+CELL_SPACING = 4.0  # world units between successive cells (molecules) in the spiral
 
-# Individual atoms within one molecule/cell pack tighter than whole cells do
-# - kept small enough that a molecule's atoms stay roughly within the same
-# footprint as CELL_TRIANGLE, so the atom-level render (Renderer) doesn't
-# visibly outgrow the coarser physics hull (body_hull) it's drawn on top of.
 ATOM_SPACING = 1.3
 # Bigger than a tight packing radius (overlapping neighbors) - at typical
 # zoomed-out camera distances a few world units is only a handful of
@@ -78,18 +69,28 @@ def _convex_hull(points: list) -> list:
     return lower[:-1] + upper[:-1]
 
 
-def body_hull(cell_count: int, scale: float = 1.0) -> list:
-    """Convex hull of `cell_count` copies of the cell triangle, arranged in
-    a spiral and scaled - the single source of truth for what an N-cell
-    body looks like. Used both for the physics shape (Substance) and the
-    render texture (Renderer), so what's drawn always matches what's
-    actually collided with."""
-    cell_count = max(1, cell_count)
+# Small square footprint around each atom's exact position so the hull
+# actually encloses its visual radius, not just a zero-size point.
+_ATOM_FOOTPRINT = (
+    (-ATOM_RADIUS, -ATOM_RADIUS), (ATOM_RADIUS, -ATOM_RADIUS),
+    (ATOM_RADIUS, ATOM_RADIUS), (-ATOM_RADIUS, ATOM_RADIUS),
+)
+
+
+def body_hull(molecules: list, scale: float = 1.0) -> list:
+    """Convex hull of the body's actual atoms (see atom_positions), each
+    inflated by its visual footprint - not a coarse per-cell
+    approximation. Single source of truth for what a body looks like,
+    used both for the physics shape (Substance) and the render texture
+    (Renderer), so what's drawn always matches what's actually collided
+    with - and both actually reflect the real molecule structure, not
+    just how many cells/molecules there are."""
+    positions = atom_positions(molecules) or [(0.0, 0.0, None)]
 
     points = []
-    for ox, oy in cell_offsets(cell_count):
-        for vx, vy in CELL_TRIANGLE:
-            points.append((ox + vx, oy + vy))
+    for x, y, _ in positions:
+        for dx, dy in _ATOM_FOOTPRINT:
+            points.append((x + dx, y + dy))
 
     hull = _convex_hull(points)
     return [(x * scale, y * scale) for x, y in hull]

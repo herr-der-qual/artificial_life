@@ -1,7 +1,7 @@
 import pytest
 
 from core.molecule_factory import MoleculeFactory
-from simulation.body_geometry import CELL_TRIANGLE
+from simulation.body_geometry import body_hull
 from simulation.matter import Matter
 from simulation.substance import Substance
 
@@ -13,10 +13,12 @@ def make_matter(molecule_count):
     return matter
 
 
-def test_single_molecule_shape_matches_the_classic_triangle():
-    substance = Substance(make_matter(1), color=(0, 0, 255))
+def test_single_molecule_shape_matches_body_hull_of_its_own_matter():
+    matter = make_matter(1)
+    substance = Substance(matter, color=(0, 0, 255))
+
     vertices = set(substance.shape.get_vertices())
-    assert vertices == set(CELL_TRIANGLE)
+    assert vertices == set(body_hull(matter.molecules, scale=1.0))
 
 
 def test_multi_molecule_shape_has_more_vertices_and_a_bigger_footprint():
