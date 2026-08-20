@@ -1,6 +1,7 @@
 import math
 
 import arcade
+import pymunk
 
 from core.settings import Settings
 from core.sumulation_runner import SimulationRunner
@@ -10,8 +11,13 @@ from .camera import Camera
 from .renderer import Renderer
 from .control_panel import ControlPanel
 from .stats_panel import StatsPanel
+from .inspector_panel import InspectorPanel
 from .file_menu import FileMenu
 from .save_as_dialog import SaveAsDialog
+
+# How close (world units) a click needs to land to an organism to select
+# it - generous enough to be forgiving without a zoom-dependent radius.
+SELECT_RADIUS = 40.0
 
 
 class WorldView(arcade.View):
@@ -39,6 +45,7 @@ class WorldView(arcade.View):
         self.control_panel = ControlPanel(self.runner, self.settings)
         self.stats_panel = StatsPanel(self.world)
         self.stats_panel.is_open = self.settings.get("stats_panel_open")
+        self.inspector_panel = InspectorPanel()
         self.file_menu = FileMenu(on_load=self.load_world, on_save=self.save_world, on_save_as=self.open_save_as_dialog)
 
         default_dir = WORLD_CONFIGS_DIR if WORLD_CONFIGS_DIR.exists() else None
@@ -57,6 +64,7 @@ class WorldView(arcade.View):
             self.runner.world = self.world
 
         self.stats_panel.world = self.world
+        self.inspector_panel.select(None)  # selection belonged to the old world
 
     def save_world(self):
         self.world_config.save()
@@ -94,6 +102,7 @@ class WorldView(arcade.View):
         if not self.ui_hidden:
             self.control_panel.draw()
             self.stats_panel.draw()
+            self.inspector_panel.draw()
             self.file_menu.draw()
             self.save_as_dialog.draw()
 
@@ -101,6 +110,7 @@ class WorldView(arcade.View):
         self.camera.update()
         self.control_panel.on_update(delta_time)
         self.stats_panel.on_update(delta_time)
+        self.inspector_panel.on_update(delta_time)
         self.settings.set("stats_panel_open", self.stats_panel.is_open)
 
     def on_key_press(self, key, modifiers):
@@ -124,6 +134,31 @@ class WorldView(arcade.View):
     def on_mouse_press(self, x, y, button, modifiers):
         if button == arcade.MOUSE_BUTTON_MIDDLE:
             self.control_panel.toggle_pause()
+            return
+
+        if button == arcade.MOUSE_BUTTON_LEFT:
+            self._select_organism_at(x, y)
+
+    def _select_organism_at(self, screen_x, screen_y):
+        """Point query (see ai/tasks/seek_*_task.py for the same pattern)
+        at the click, converted from screen to world space via the
+        camera - nearest organism within SELECT_RADIUS gets shown in the
+        inspector panel; clicking empty space clears the selection."""
+        world_point = self.camera.unproject((screen_x, screen_y))
+        results = self.world.space.point_query(
+            (world_point.x, world_point.y), SELECT_RADIUS, pymunk.ShapeFilter(),
+        )
+
+        nearest = None
+        min_distance = float("inf")
+        for info in results:
+            if info.shape.collision_type != 2:
+                continue
+            if info.distance < min_distance:
+                min_distance = info.distance
+                nearest = info.shape.body
+
+        self.inspector_panel.select(nearest)
 
     def on_mouse_drag(self, *args):
         self.camera.on_mouse_drag(*args)
@@ -137,6 +172,6 @@ class WorldView(arcade.View):
         self.settings.set("ui_hidden", self.ui_hidden)
 
     def _set_ui_enabled(self, enabled: bool):
-        panels = (self.control_panel, self.stats_panel, self.file_menu, self.save_as_dialog)
+        panels = (self.control_panel, self.stats_panel, self.inspector_panel, self.file_menu, self.save_as_dialog)
         for panel in panels:
             panel.enable() if enabled else panel.disable()
