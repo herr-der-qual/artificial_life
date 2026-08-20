@@ -9,7 +9,7 @@ import pymunk
 # "flesh" is special: no Substance ever carries that kind - it's reused as
 # the diet vocabulary entry that gates live predation (World._resolve_
 # predation), not scavenging a Substance.
-FOOD_KINDS = ("basic", "rich", "simple", "corpse", "reaction_product", "flesh")
+FOOD_KINDS = ("basic", "rich", "simple", "mineral", "corpse", "reaction_product", "flesh")
 
 
 class Substance(pymunk.Body):

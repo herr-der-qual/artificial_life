@@ -5,6 +5,7 @@ from simulation.substance import Substance
 from simulation.matter import Matter
 from simulation.elements import Elements
 from core.molecule_factory import MoleculeFactory
+from core.earth_abundance import weighted_element_pool
 
 
 class SubstanceFactory:
@@ -37,14 +38,33 @@ class SubstanceFactory:
         return Substance(matter, color=(120, 190, 255), kind="simple")
 
     @staticmethod
+    def create_mineral():
+        """Rock-forming food: elements picked in real Earth-crust
+        proportions (mostly O/Si/Al - see core.earth_abundance), not the
+        fixed CHNOPS recipes above. Whether it's worth eating is for
+        natural selection to decide (silicate-like bonds may not digest
+        into much usable energy) - same as any other food kind."""
+        matter = Matter()
+        pool = weighted_element_pool()
+        matter.add_molecule(MoleculeFactory.random_molecule(pool, random.randint(2, 4)))
+
+        return Substance(matter, color=(150, 170, 200), kind="mineral")
+
+    @staticmethod
     def create_random():
-        """Create random food substance"""
+        """Create random food substance. Mineral (crust-like) food spawns
+        more often than the organic recipes, roughly echoing how real
+        rock-forming matter vastly outweighs biologically useful matter -
+        without going all the way to the real ratio, which would leave
+        almost no organic food to actually sustain a population."""
         types = [
+            SubstanceFactory.create_mineral,
             SubstanceFactory.create_basic,
             SubstanceFactory.create_rich,
-            SubstanceFactory.create_simple
+            SubstanceFactory.create_simple,
         ]
-        return random.choice(types)()
+        weights = [40, 20, 20, 20]
+        return random.choices(types, weights=weights, k=1)[0]()
 
     @staticmethod
     def spawn_at_position(substance_type='basic', x=0, y=0):
@@ -55,6 +75,8 @@ class SubstanceFactory:
             substance = SubstanceFactory.create_rich()
         elif substance_type == 'simple':
             substance = SubstanceFactory.create_simple()
+        elif substance_type == 'mineral':
+            substance = SubstanceFactory.create_mineral()
         elif substance_type == 'random':
             substance = SubstanceFactory.create_random()
         else:
@@ -77,6 +99,16 @@ class SubstanceFactory:
         Elements.N: (60, 110, 210),
         Elements.S: (30, 70, 170),
         Elements.P: (100, 170, 240),
+        # Crust/mineral elements (see core.earth_abundance) - grayer,
+        # cooler blues to read as "rock" rather than "organic".
+        Elements.Si: (130, 150, 175),
+        Elements.Al: (150, 165, 185),
+        Elements.Na: (115, 140, 170),
+        Elements.Mg: (100, 130, 165),
+        Elements.Cl: (80, 160, 200),
+        Elements.F: (170, 190, 210),
+        Elements.Li: (120, 145, 175),
+        Elements.B: (110, 135, 165),
     }
 
     @staticmethod

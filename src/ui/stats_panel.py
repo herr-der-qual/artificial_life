@@ -45,11 +45,15 @@ class StatsPanel:
         self.radius_label = arcade.gui.UILabel(text="Avg search radius: 0", width=content_width)
         self.generation_label = arcade.gui.UILabel(text="Max generation: 0", width=content_width)
         self.cell_count_label = arcade.gui.UILabel(text="Avg/Max cells: 0.0 / 0", width=content_width)
+        self.predator_pct_label = arcade.gui.UILabel(text="Predators: 0%", width=content_width)
+        self.herbivore_pct_label = arcade.gui.UILabel(text="Herbivores: 0%", width=content_width)
+        self.mineral_pct_label = arcade.gui.UILabel(text="Mineral eaters: 0%", width=content_width)
 
         for label in (
             self.total_label, self.alive_label, self.deaths_label, self.births_label, self.immigrants_label,
             self.food_label, self.predation_label, self.energy_label, self.speed_label, self.radius_label,
             self.generation_label, self.cell_count_label,
+            self.predator_pct_label, self.herbivore_pct_label, self.mineral_pct_label,
         ):
             stack.add(label)
 
@@ -136,15 +140,27 @@ class StatsPanel:
             avg_radius = sum(o.genome.search_radius for o in organisms) / alive
             avg_cell_count = sum(o.cell_count for o in organisms) / alive
             max_cell_count = max(o.cell_count for o in organisms)
+            # Independent percentages, not mutually exclusive buckets - diet
+            # is a set of flags (an organism can be a generalist eating all
+            # three), so these can add up to more than 100%.
+            predator_pct = sum(1 for o in organisms if "flesh" in o.diet) / alive * 100
+            herbivore_pct = sum(1 for o in organisms if o.diet & {"basic", "rich", "simple"}) / alive * 100
+            mineral_pct = sum(1 for o in organisms if "mineral" in o.diet) / alive * 100
         else:
             avg_energy_ratio = 0.0
             avg_speed = 0.0
             avg_radius = 0.0
             avg_cell_count = 0.0
             max_cell_count = 0
+            predator_pct = 0.0
+            herbivore_pct = 0.0
+            mineral_pct = 0.0
 
         self.energy_label.text = f"Avg energy: {avg_energy_ratio:.0f}%"
         self.speed_label.text = f"Avg speed: {avg_speed:.1f}"
         self.radius_label.text = f"Avg search radius: {avg_radius:.0f}"
         self.generation_label.text = f"Max generation: {self.world.max_generation_reached}"
         self.cell_count_label.text = f"Avg/Max cells: {avg_cell_count:.1f} / {max_cell_count}"
+        self.predator_pct_label.text = f"Predators: {predator_pct:.0f}%"
+        self.herbivore_pct_label.text = f"Herbivores: {herbivore_pct:.0f}%"
+        self.mineral_pct_label.text = f"Mineral eaters: {mineral_pct:.0f}%"
