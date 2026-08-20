@@ -12,17 +12,46 @@ GOLDEN_ANGLE = math.pi * (3 - math.sqrt(5))
 CELL_TRIANGLE = ((-4.0, -4.0), (0.0, 4.0), (4.0, -4.0))
 CELL_SPACING = 4.0  # world units between successive cells in the spiral
 
+# Individual atoms within one molecule/cell pack tighter than whole cells do
+# - kept small enough that a molecule's atoms stay roughly within the same
+# footprint as CELL_TRIANGLE, so the atom-level render (Renderer) doesn't
+# visibly outgrow the coarser physics hull (body_hull) it's drawn on top of.
+ATOM_SPACING = 1.3
+# Bigger than a tight packing radius (overlapping neighbors) - at typical
+# zoomed-out camera distances a few world units is only a handful of
+# screen pixels, and tiny sparse dots read as noise rather than a body.
+ATOM_RADIUS = 1.6
 
-def cell_offsets(count: int) -> list:
+
+def _spiral_offsets(count: int, spacing: float) -> list:
     if count <= 1:
         return [(0.0, 0.0)]
 
     offsets = []
     for i in range(count):
-        r = CELL_SPACING * math.sqrt(i)
+        r = spacing * math.sqrt(i)
         theta = i * GOLDEN_ANGLE
         offsets.append((r * math.cos(theta), r * math.sin(theta)))
     return offsets
+
+
+def cell_offsets(count: int) -> list:
+    return _spiral_offsets(count, CELL_SPACING)
+
+
+def atom_positions(molecules: list) -> list:
+    """Every atom's body-local (x, y, element) - cells (molecules) laid out
+    via cell_offsets, each molecule's own atoms nested inside via a
+    tighter spiral. Single source of truth for the atom-level render (see
+    ui.renderer) - body_hull stays the coarser per-cell shape physics
+    actually collides with."""
+    molecules = list(molecules)
+    positions = []
+    for (cx, cy), molecule in zip(cell_offsets(max(1, len(molecules))), molecules):
+        atom_offsets = _spiral_offsets(len(molecule.atoms), ATOM_SPACING)
+        for (ax, ay), atom in zip(atom_offsets, molecule.atoms):
+            positions.append((cx + ax, cy + ay, atom.element))
+    return positions
 
 
 def _convex_hull(points: list) -> list:

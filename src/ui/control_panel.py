@@ -43,11 +43,17 @@ class ControlPanel:
         self.step_button = arcade.gui.UIFlatButton(text="Step N", width=70)
         self.step2_button = arcade.gui.UIFlatButton(text="Step 2N", width=75)
 
+        self.show_hitboxes = self.settings.get("show_hitboxes")
+        self.hitboxes_button = arcade.gui.UIFlatButton(
+            text=self._hitboxes_text(), width=110,
+        )
+
         self.speed_slider.on_change = self._on_speed_change
         self.pause_button.on_click = self._on_pause_click
         self.n_input.on_change = self._on_n_change
         self.step_button.on_click = self._on_step_click
         self.step2_button.on_click = self._on_step2_click
+        self.hitboxes_button.on_click = self._on_hitboxes_click
 
     def _layout(self):
         speed_row = arcade.gui.UIBoxLayout(vertical=False, space_between=8)
@@ -61,6 +67,7 @@ class ControlPanel:
         step_row.add(self.n_input)
         step_row.add(self.step_button)
         step_row.add(self.step2_button)
+        step_row.add(self.hitboxes_button)
 
         stack = arcade.gui.UIBoxLayout(vertical=True, align="left", space_between=6)
         stack.add(speed_row)
@@ -84,6 +91,9 @@ class ControlPanel:
     def _refresh_pause_button(self):
         self.pause_button.text = self._pause_text()
 
+    def _hitboxes_text(self) -> str:
+        return f"Hitboxes: {'On' if self.show_hitboxes else 'Off'}"
+
     # -- widget callbacks ---------------------------------------------------
 
     def _on_speed_change(self, event):
@@ -102,6 +112,15 @@ class ControlPanel:
         self.runner.toggle_pause()
         self._refresh_pause_button()
         self.settings.set("paused", self.runner.paused)
+
+    def _on_hitboxes_click(self, event):
+        self.toggle_hitboxes()
+
+    def toggle_hitboxes(self):
+        """Shared by the button and the Ctrl+B shortcut (see WorldView)."""
+        self.show_hitboxes = not self.show_hitboxes
+        self.hitboxes_button.text = self._hitboxes_text()
+        self.settings.set("show_hitboxes", self.show_hitboxes)
 
     def _on_n_change(self, event):
         n = self._parse_n()

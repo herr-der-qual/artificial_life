@@ -1,6 +1,8 @@
 import pytest
 
-from simulation.body_geometry import body_hull, cell_offsets, CELL_TRIANGLE
+from core.molecule_factory import MoleculeFactory
+from simulation.elements import Elements
+from simulation.body_geometry import body_hull, cell_offsets, atom_positions, CELL_TRIANGLE
 
 
 def test_single_cell_hull_matches_the_classic_triangle():
@@ -57,3 +59,34 @@ def test_cell_offsets_are_unique_and_spread_out():
 
 def test_body_hull_treats_non_positive_count_as_one_cell():
     assert set(body_hull(0, scale=1.0)) == set(CELL_TRIANGLE)
+
+
+def test_atom_positions_returns_one_entry_per_atom():
+    water = MoleculeFactory.water()  # O, H, H - 3 atoms
+    co2 = MoleculeFactory.co2()  # C, O, O - 3 atoms
+
+    positions = atom_positions([water, co2])
+
+    assert len(positions) == 6
+
+
+def test_atom_positions_pairs_each_point_with_its_real_element():
+    water = MoleculeFactory.water()
+
+    positions = atom_positions([water])
+    elements = sorted(element.name for _, _, element in positions)
+
+    assert elements == sorted(["O", "H", "H"])
+
+
+def test_atom_positions_spreads_atoms_apart_within_a_molecule():
+    molecule = MoleculeFactory.random_molecule([Elements.C], 5)
+
+    positions = atom_positions([molecule])
+    xy_points = [(x, y) for x, y, _ in positions]
+
+    assert len(set(xy_points)) == len(xy_points)
+
+
+def test_atom_positions_is_empty_for_no_molecules():
+    assert atom_positions([]) == []

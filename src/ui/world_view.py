@@ -73,6 +73,14 @@ class WorldView(arcade.View):
     def on_hide_view(self):
         self._set_ui_enabled(False)
 
+    def on_deactivate(self):
+        """Window lost focus - e.g. a background hotkey (Win+Shift+S
+        screenshot, alt-tab, etc.) stole it mid-keypress. If a movement
+        key's release never reaches us because of that, camera velocity
+        gets stuck scrolling; reset it unconditionally here rather than
+        trying to guess which key was involved."""
+        self.camera.velocity = [0, 0]
+
     def on_draw(self):
         self.clear()
         self.camera.use()
@@ -80,6 +88,7 @@ class WorldView(arcade.View):
         center = arcade.XYWH(-2.5, -2.5, 5, 5)
         arcade.draw_rect_filled(center, (255, 255, 255))
 
+        self.renderer.show_hitboxes = self.control_panel.show_hitboxes
         self.renderer.render(self.world.organisms + self.world.substances)
 
         if not self.ui_hidden:
@@ -101,6 +110,10 @@ class WorldView(arcade.View):
 
         if key == arcade.key.S and modifiers & arcade.key.MOD_CTRL:
             self.save_world()
+            return
+
+        if key == arcade.key.B and modifiers & arcade.key.MOD_CTRL:
+            self.control_panel.toggle_hitboxes()
             return
 
         self.camera.on_key_press(key, modifiers)
