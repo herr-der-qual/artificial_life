@@ -25,7 +25,7 @@ class Renderer:
         self.show_grid = False
         self._grid_line_cache = None  # ((width, height), point_list) - rebuilt only if the grid size changes
 
-    def render(self, grid):
+    def render(self, grid, selected=None):
         seen_ids = set()
 
         for entity in grid:
@@ -49,6 +49,22 @@ class Renderer:
 
         if self.show_grid:
             self._draw_grid_lines(grid)
+
+        if selected is not None:
+            self._draw_selection_outline(selected, grid)
+
+    def _draw_selection_outline(self, entity, grid):
+        col, row = entity.position
+        # The selected entity may since have died/been eaten - only
+        # outline it while it's still actually sitting where we think it
+        # is, not whatever now occupies that cell.
+        if grid.occupant_at(col, row) is not entity:
+            return
+
+        center_x = col * CELL_PIXELS + CELL_PIXELS / 2
+        center_y = row * CELL_PIXELS + CELL_PIXELS / 2
+        rect = arcade.XYWH(center_x, center_y, CELL_PIXELS, CELL_PIXELS)
+        arcade.draw_rect_outline(rect, arcade.color.YELLOW, border_width=3)
 
     def _draw_grid_lines(self, grid):
         cache_key = (grid.width, grid.height)
