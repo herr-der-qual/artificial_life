@@ -64,6 +64,9 @@ class Renderer:
         self._sprites_by_id = {}
         self._textures = {}
 
+        self.show_grid = False
+        self._grid_line_cache = None  # ((width, height), point_list) - rebuilt only if the grid size changes
+
     def _texture_for(self, food) -> arcade.Texture:
         positions = atom_positions(food.matter.molecules)
         signature = (
@@ -99,3 +102,34 @@ class Renderer:
             self.sprite_list.remove(self._sprites_by_id.pop(key))
 
         self.sprite_list.draw()
+
+        if self.show_grid:
+            self._draw_grid_lines(grid)
+
+    def _draw_grid_lines(self, grid):
+        cache_key = (grid.width, grid.height)
+        if self._grid_line_cache is None or self._grid_line_cache[0] != cache_key:
+            self._grid_line_cache = (cache_key, self._build_grid_line_points(grid))
+
+        _, points = self._grid_line_cache
+        arcade.draw_lines(points, (70, 70, 70, 255), 1)
+
+    @staticmethod
+    def _build_grid_line_points(grid) -> list:
+        """Just the cell dividers (grid.width+1 vertical + grid.height+1
+        horizontal lines) - a fixed, small count independent of how much
+        is actually on the field, so plain immediate-mode drawing is fine
+        here (unlike per-entity hitboxes, which needed batching)."""
+        width_px = grid.width * CELL_PIXELS
+        height_px = grid.height * CELL_PIXELS
+
+        points = []
+        for col in range(grid.width + 1):
+            x = col * CELL_PIXELS
+            points.append((x, 0))
+            points.append((x, height_px))
+        for row in range(grid.height + 1):
+            y = row * CELL_PIXELS
+            points.append((0, y))
+            points.append((width_px, y))
+        return points

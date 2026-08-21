@@ -15,6 +15,7 @@ class World:
     def __init__(self, width: int = 40, height: int = 30, food_count: int = 80, organism_count: int = 20):
         self.grid = Grid(width, height)
         self.organisms = []
+        self.tick_count = 0
 
         for _ in range(min(food_count, width * height)):
             self._spawn_food()
@@ -40,5 +41,6 @@ class World:
                 return col, row
 
     def update(self):
+        self.tick_count += 1
         for organism in self.organisms:
             organism.step(self.grid)

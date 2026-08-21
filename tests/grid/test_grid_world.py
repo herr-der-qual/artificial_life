@@ -55,3 +55,14 @@ def test_update_never_lets_two_organisms_collide():
         world.update()
         positions = [o.position for o in world.organisms]
         assert len(set(positions)) == len(positions)
+
+
+def test_tick_count_starts_at_zero_and_increments_on_update():
+    world = World(width=10, height=10, food_count=0, organism_count=1)
+    assert world.tick_count == 0
+
+    world.update()
+    world.update()
+    world.update()
+
+    assert world.tick_count == 3
