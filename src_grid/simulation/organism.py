@@ -4,22 +4,24 @@ from simulation.matter import Matter
 from simulation.reactor import Reactor
 
 from src_grid.simulation.food import Food
+from src_grid.simulation.genome import Genome
 
 
 class Organism:
     """A movable, energy-driven entity on the Grid. No diet/brain yet (see
     the pymunk-based Organism for where those eventually come from once
     this model is proven out) - just enough to prove a real
-    energy/eating/death/reproduction loop works on a discrete field.
+    energy/eating/death/reproduction/genetics loop works on a discrete
+    field. max_energy and energy_drain_rate come from the organism's own
+    Genome, not a shared class constant - two organisms can genuinely
+    differ now, and reproduction (see OrganismFactory) passes those
+    differences on with mutation.
 
     Movement doubles as foraging: each tick the organism checks its four
     neighboring cells for food first and moves onto it (eating it) if
     there is any, falling back to a random free direction otherwise -
     there's no brain/search radius yet, so "seeking" food only reaches as
     far as the organism can already see from where it's standing."""
-
-    MAX_ENERGY = 100.0
-    ENERGY_DRAIN_PER_TICK = 2.0
 
     # Calibrated in grid ticks (this world has no delta_time), not the
     # pymunk system's seconds - REPRODUCE_MATTER_THRESHOLD is kept the
@@ -32,11 +34,15 @@ class Organism:
 
     _DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
-    def __init__(self, matter: Matter, color, energy: float = None, generation: int = 0):
+    def __init__(self, matter: Matter, genome: Genome, energy: float = None, generation: int = 0):
         self.matter = matter
-        self.color = color
+        self.genome = genome
+        self.color = genome.color
+        self.max_energy = genome.max_energy
+        self.energy_drain_rate = genome.energy_drain_rate
+
         self.position = (0, 0)  # (col, row) - set for real by Grid.place
-        self.energy = self.MAX_ENERGY if energy is None else energy
+        self.energy = self.max_energy if energy is None else energy
         self.is_alive = True
         self.generation = generation
 
@@ -49,7 +55,7 @@ class Organism:
         """Drain energy and die of starvation if it runs out; otherwise
         move one cell - onto adjacent food if there is any (eating it), or
         a random free direction otherwise. Returns whether it ate."""
-        self.energy -= self.ENERGY_DRAIN_PER_TICK
+        self.energy -= self.energy_drain_rate
         self.reproduction_cooldown = max(0, self.reproduction_cooldown - 1)
         if self.energy <= 0:
             self.is_alive = False
@@ -83,7 +89,7 @@ class Organism:
         (the reaction's products) are stashed in reserve to fund a future
         reproduction (see can_reproduce)."""
         result = Reactor.react(food.matter.molecules, catalyzed=True)
-        self.energy = min(self.MAX_ENERGY, self.energy + result.energy_delta)
+        self.energy = min(self.max_energy, self.energy + result.energy_delta)
         for product in result.products:
             self.reserve.add_molecule(product)
 

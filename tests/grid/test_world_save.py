@@ -3,6 +3,7 @@ from simulation.matter import Matter
 
 from src_grid.core.world_config import WorldConfig
 from src_grid.core.world_save import save_world, load_world, world_to_dict, world_from_dict
+from src_grid.simulation.genome import Genome
 from src_grid.simulation.world import World
 from src_grid.simulation.organism import Organism
 
@@ -99,7 +100,8 @@ def test_round_trip_preserves_energy_and_lifetime_counters(tmp_path):
 def test_round_trip_preserves_reproduction_state(tmp_path):
     world = World(make_config(tmp_path, width=10, height=10, food_count=0, organism_count=0))
 
-    organism = Organism(_matter(), color=(1, 2, 3), energy=42.0, generation=5)
+    genome = Genome(max_energy=90.0, energy_drain_rate=2.5, color=(1, 2, 3))
+    organism = Organism(_matter(), genome, energy=42.0, generation=5)
     organism.reproduction_cooldown = 3
     organism.reserve.add_molecule(MoleculeFactory.simple_organic())
     world.grid.place(organism, 4, 4)
@@ -115,6 +117,10 @@ def test_round_trip_preserves_reproduction_state(tmp_path):
     assert restored.generation == 5
     assert restored.reproduction_cooldown == 3
     assert restored.reserve.mass == organism.reserve.mass
+    # The genome itself has to survive the round trip too - it's the
+    # whole point of adding real genetics (see Genome).
+    assert restored.max_energy == genome.max_energy
+    assert restored.energy_drain_rate == genome.energy_drain_rate
 
 
 def _matter() -> Matter:

@@ -7,6 +7,7 @@ from simulation.molecule import Molecule
 
 from src_grid.core.world_config import WorldConfig
 from src_grid.simulation.food import Food
+from src_grid.simulation.genome import Genome
 from src_grid.simulation.organism import Organism
 from src_grid.simulation.world import World
 
@@ -58,6 +59,8 @@ def world_to_dict(world: World) -> dict:
         }
         if id(entity) in organism_ids:
             entry["energy"] = entity.energy
+            entry["max_energy"] = entity.genome.max_energy
+            entry["energy_drain_rate"] = entity.genome.energy_drain_rate
             entry["generation"] = entity.generation
             entry["reproduction_cooldown"] = entity.reproduction_cooldown
             entry["reserve"] = _serialize_matter(entity.reserve)
@@ -99,8 +102,13 @@ def world_from_dict(data: dict) -> World:
         world.grid.place(food, entry["col"], entry["row"])
 
     for entry in data["organisms"]:
+        genome = Genome(
+            max_energy=entry.get("max_energy", 100.0),
+            energy_drain_rate=entry.get("energy_drain_rate", 2.0),
+            color=tuple(entry["color"]),
+        )
         organism = Organism(
-            _deserialize_matter(entry["matter"]), tuple(entry["color"]),
+            _deserialize_matter(entry["matter"]), genome,
             energy=entry.get("energy"), generation=entry.get("generation", 0),
         )
         organism.reproduction_cooldown = entry.get("reproduction_cooldown", 0)

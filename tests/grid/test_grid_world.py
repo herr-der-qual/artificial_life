@@ -3,6 +3,7 @@ from simulation.matter import Matter
 
 from src_grid.core.world_config import WorldConfig
 from src_grid.core.food_factory import FoodFactory
+from src_grid.simulation.genome import Genome
 from src_grid.simulation.world import World
 from src_grid.simulation.organism import Organism
 
@@ -11,6 +12,10 @@ def make_config(tmp_path, **overrides):
     config = WorldConfig(path=tmp_path / "grid_world_config.json")
     config.data.update(overrides)
     return config
+
+
+def _genome(color=(0, 0, 0), max_energy=100.0, energy_drain_rate=2.0) -> Genome:
+    return Genome(max_energy=max_energy, energy_drain_rate=energy_drain_rate, color=color)
 
 
 def test_spawns_the_requested_amount_of_food(tmp_path):
@@ -49,12 +54,13 @@ def test_update_moves_at_least_one_organism_over_many_ticks(tmp_path):
     """A single tick can be a no-op (blocked move, or the unlucky random
     direction picks off the edge) - across many ticks, on an otherwise
     empty field, organisms should clearly have moved somewhere. Kept well
-    under starvation range (MAX_ENERGY / ENERGY_DRAIN_PER_TICK = 50 ticks)
-    so the population is still fully alive to compare positions against."""
+    under starvation range (organisms live at least 70/3.0 ~= 23 ticks -
+    see Genome.random()'s worst case) so the population is still fully
+    alive to compare positions against."""
     world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=5))
     starting_positions = [o.position for o in world.organisms]
 
-    for _ in range(20):
+    for _ in range(15):
         world.update()
 
     ending_positions = [o.position for o in world.organisms]
@@ -64,28 +70,39 @@ def test_update_moves_at_least_one_organism_over_many_ticks(tmp_path):
 def test_update_never_lets_two_organisms_collide(tmp_path):
     world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=15))
 
-    for _ in range(20):
+    for _ in range(15):
         world.update()
         positions = [o.position for o in world.organisms]
         assert len(set(positions)) == len(positions)
 
 
 def test_organisms_starve_and_get_removed_once_energy_runs_out(tmp_path):
-    world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=5))
-    ticks_to_starve = int(Organism.MAX_ENERGY / Organism.ENERGY_DRAIN_PER_TICK)
+    """Corpses are edible (see below), so a still-living organism can eat
+    a dead one's corpse and outlive a naive worst-case estimate - random
+    genomes (see Genome.random()) make "everyone's dead by tick N" an
+    unreliable assertion in general (that's the point: it's how the
+    population sustains itself). Sidestep that by giving every organism
+    the exact same genome and no food at all - with nothing to eat and no
+    energy difference between them, they starve in perfect lockstep, with
+    no living organism ever around to cannibalize a corpse."""
+    world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=0))
+    genome = _genome()
+    for col in range(5):
+        organism = Organism(_simple_matter(), genome)
+        world.grid.place(organism, col, 0)
+        world.organisms.append(organism)
 
-    for _ in range(ticks_to_starve):
+    for _ in range(int(genome.max_energy / genome.energy_drain_rate)):
         world.update()
 
     assert world.organisms == []
-    # The cells aren't empty - each death left a corpse behind (see below).
-    assert len(world.grid) == 5
     assert world.deaths_count == 5
+    assert len(world.grid) == 5  # every corpse still there - nobody was left alive to eat one
 
 
 def test_death_leaves_a_corpse_made_of_the_organisms_own_matter(tmp_path):
     world = World(make_config(tmp_path, width=10, height=10, food_count=0, organism_count=0))
-    organism = Organism(_simple_matter(), color=(0, 0, 0), energy=Organism.ENERGY_DRAIN_PER_TICK)
+    organism = Organism(_simple_matter(), _genome(), energy=2.0)
     world.grid.place(organism, 4, 4)
     world.organisms.append(organism)
     original_matter = organism.matter
@@ -105,7 +122,7 @@ def test_eating_food_is_counted_and_removes_it_from_the_grid(tmp_path):
     to a random direction, so a single adjacent food is always found and
     eaten - deterministic, no retry loop needed."""
     world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=0))
-    organism = Organism(_simple_matter(), color=(0, 0, 0))
+    organism = Organism(_simple_matter(), _genome())
     organism.reproduction_cooldown = 999  # isolate this test from reproduction
     world.grid.place(organism, 5, 5)
     world.organisms.append(organism)
@@ -125,7 +142,7 @@ def _simple_matter() -> Matter:
 
 
 def _ready_to_reproduce() -> Organism:
-    organism = Organism(_simple_matter(), color=(0, 0, 0), energy=Organism.MAX_ENERGY)
+    organism = Organism(_simple_matter(), _genome(), energy=100.0)
     while organism.reserve.mass < Organism.REPRODUCE_MATTER_THRESHOLD:
         organism.reserve.add_molecule(MoleculeFactory.simple_organic())
     return organism
@@ -165,7 +182,7 @@ def test_reproduction_is_skipped_with_no_free_neighbor_cell(tmp_path):
 
     assert len(world.organisms) == 1
     assert world.births_count == 0
-    assert parent.energy == energy_before - Organism.ENERGY_DRAIN_PER_TICK
+    assert parent.energy == energy_before - parent.energy_drain_rate
     assert parent.reserve.mass == reserve_before
 
 
