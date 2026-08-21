@@ -138,6 +138,10 @@ class View(arcade.View):
             self._load_saved_world()
             return
 
+        if key == arcade.key.R and modifiers & arcade.key.MOD_CTRL:
+            self._restart_world()
+            return
+
         self.camera.on_key_press(key, modifiers)
 
     def _load_saved_world(self):
@@ -146,6 +150,14 @@ class View(arcade.View):
         except FileNotFoundError:
             return
 
+        self.stats_panel.world = self.world
+
+    def _restart_world(self):
+        """Re-read the active config off disk (in case it was hand-edited
+        or swapped via NewWorldDialog's "Load from file...") and spin up a
+        fresh world from it - a reset, not a resume, unlike Ctrl+L."""
+        self.world.config.load()
+        self.world = World(self.world.config)
         self.stats_panel.world = self.world
 
     # -- file menu / dialogs hooks -------------------------------------------
