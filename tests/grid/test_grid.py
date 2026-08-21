@@ -105,3 +105,55 @@ def test_iterating_the_grid_yields_all_occupants():
     grid.place(c, 2, 2)
 
     assert set(grid) == {a, b, c}
+
+
+def test_nearby_positions_finds_occupants_within_radius():
+    grid = Grid(20, 20)
+    grid.place(FakeEntity(), 10, 10)
+    grid.place(FakeEntity(), 12, 10)  # 2 away - within radius 3
+    grid.place(FakeEntity(), 10, 18)  # far - outside radius 3
+
+    found = set(grid.nearby_positions(10, 10, 3))
+
+    assert found == {(10, 10), (12, 10)}
+
+
+def test_nearby_positions_respects_a_bucket_boundary():
+    """The two positions land in different buckets (BUCKET_SIZE=8) - the
+    index has to check neighboring buckets too, not just the query
+    point's own bucket."""
+    grid = Grid(20, 20)
+    grid.place(FakeEntity(), 7, 7)   # bucket (0, 0)
+    grid.place(FakeEntity(), 8, 7)   # bucket (1, 0) - adjacent cell, different bucket
+
+    found = set(grid.nearby_positions(7, 7, 2))
+
+    assert found == {(7, 7), (8, 7)}
+
+
+def test_nearby_positions_index_stays_correct_after_remove_and_move():
+    grid = Grid(20, 20)
+    a = FakeEntity()
+    b = FakeEntity()
+    grid.place(a, 5, 5)
+    grid.place(b, 6, 5)
+
+    grid.remove(a)
+    assert (5, 5) not in set(grid.nearby_positions(5, 5, 3))
+
+    grid.move(b, 9, 9)  # jumps to a different bucket
+    assert set(grid.nearby_positions(9, 9, 1)) == {(9, 9)}
+    assert (6, 5) not in set(grid.nearby_positions(6, 5, 3))
+
+
+def test_nearby_positions_empty_buckets_are_pruned():
+    """Not observable through the public API directly, but an unbounded
+    _buckets dict full of empty sets would be a slow, silent leak on a
+    long-running world with lots of turnover (spawns/deaths/moves) - make
+    sure vacated buckets are actually dropped, not just emptied."""
+    grid = Grid(20, 20)
+    entity = FakeEntity()
+    grid.place(entity, 5, 5)
+    grid.remove(entity)
+
+    assert grid._buckets == {}

@@ -32,10 +32,11 @@ class Organism:
     REPRODUCE_MATTER_THRESHOLD = 25.0
     REPRODUCE_COOLDOWN = 10  # ticks
 
-    # How far the organism can "see" food to path toward, in cells - a
-    # (2R+1)^2 square scanned every tick it isn't already next to food, so
-    # this stays modest rather than mirroring the pymunk system's much
-    # larger continuous-space search_radius.
+    # How far the organism can "see" food to path toward, in cells -
+    # checked every tick it isn't already next to food, via Grid's
+    # spatial index (see _nearest_visible_food) rather than a raw square
+    # scan, so this can stay generous without costing much even when
+    # most of that area is empty.
     SEARCH_RADIUS = 5
 
     _DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1)]
@@ -103,20 +104,21 @@ class Organism:
 
     def _nearest_visible_food(self, grid, col, row):
         """The closest Food (Manhattan distance) within SEARCH_RADIUS
-        cells, or None if there isn't one - a plain square scan, not a
-        spatial index, so this stays cheap only because SEARCH_RADIUS is
-        kept modest (see the class docstring)."""
+        cells, or None if there isn't one. Grid.nearby_positions() only
+        visits occupied cells near (col, row) via its bucket index, not
+        every cell in the search square - previously a plain O(radius^2)
+        scan regardless of how much of that square was actually empty,
+        profiled as the dominant cost in World.update() at a few thousand
+        organisms."""
         best, best_distance = None, None
-        r = self.SEARCH_RADIUS
-        for dc in range(-r, r + 1):
-            for dr in range(-r, r + 1):
-                if dc == 0 and dr == 0:
-                    continue
-                candidate = (col + dc, row + dr)
-                if isinstance(grid.occupant_at(*candidate), Food):
-                    distance = abs(dc) + abs(dr)
-                    if best_distance is None or distance < best_distance:
-                        best, best_distance = candidate, distance
+        for candidate in grid.nearby_positions(col, row, self.SEARCH_RADIUS):
+            if candidate == (col, row):
+                continue
+            if not isinstance(grid.occupant_at(*candidate), Food):
+                continue
+            distance = abs(candidate[0] - col) + abs(candidate[1] - row)
+            if best_distance is None or distance < best_distance:
+                best, best_distance = candidate, distance
         return best
 
     @staticmethod
