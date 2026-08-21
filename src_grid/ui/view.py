@@ -23,11 +23,16 @@ class View(arcade.View):
     (drag/zoom/WASD) as the pymunk world - it's plain arcade.Camera2D
     underneath, nothing pymunk-specific, so it's directly reusable.
 
-    Ticking happens directly here (no separate SimulationRunner thread
-    like the pymunk world has - the world is cheap enough, for now, that
-    a background thread isn't worth the complexity). MAX_STEPS_PER_FRAME
-    caps how many ticks a single frame can run, so "MAX" speed or a huge
-    Step N can't stall rendering entirely.
+    Ticking happens directly here, no separate SimulationRunner thread
+    like the pymunk world has - each tick is cheap enough that a
+    background thread isn't worth it. Spawning a fresh world's initial
+    population is a different story (there's no cap on food_count/
+    organism_count - see World), so *that* does run on a background
+    thread (World.populate_async()); on_update skips ticking and on_draw
+    shows a progress readout until World.population_complete flips back
+    to True. MAX_STEPS_PER_FRAME caps how many ticks a single frame can
+    run once real ticking resumes, so "MAX" speed or a huge Step N can't
+    stall rendering entirely.
     """
 
     MAX_STEPS_PER_FRAME = 500
@@ -37,6 +42,7 @@ class View(arcade.View):
         self.world = world
         self.renderer = Renderer()
         self.camera = Camera()
+        self._center_camera_on_world()
 
         self.target_tps = 5.0  # ticks/sec - see ControlPanel's speed slider
         self.paused = False
@@ -83,7 +89,15 @@ class View(arcade.View):
         self.clear()
 
         self.camera.use()
-        self.renderer.render(self.world.grid, selected=self.inspector_panel.selected)
+        if self.world.population_complete:
+            self.renderer.render(self.world.grid, selected=self.inspector_panel.selected)
+        # else: don't touch the grid at all while populate_async() is
+        # still spawning on another thread - not just because it's a
+        # plain dict (not thread-safe to iterate mid-write), but because
+        # Renderer.render() walks every entity spawned *so far* every
+        # frame, and holding population_lock for that would slow the
+        # background spawn down more the bigger it gets. Simpler and
+        # faster to just show the progress readout below instead.
 
         # Stats/UI stay fixed on screen regardless of the world camera's
         # pan/zoom - reset to the window's own default screen-space camera
@@ -96,10 +110,33 @@ class View(arcade.View):
         self.new_world_dialog.draw()
         self.save_as_dialog.draw()
 
+        if not self.world.population_complete:
+            self._draw_population_progress()
+
+    def _draw_population_progress(self):
+        done, total = self.world.population_done, self.world.population_total
+        fraction = (done / total) if total else 1.0
+
+        cx, cy = self.window.width / 2, self.window.height / 2
+        bar_width, bar_height = 320, 14
+
+        arcade.draw_text(
+            f"Generating world... {done} / {total} ({fraction * 100:.0f}%)",
+            cx, cy + 24, arcade.color.WHITE, font_size=14, anchor_x="center", anchor_y="center",
+        )
+        arcade.draw_lbwh_rectangle_filled(cx - bar_width / 2, cy - bar_height / 2, bar_width, bar_height, (40, 40, 40))
+        if fraction > 0:
+            arcade.draw_lbwh_rectangle_filled(
+                cx - bar_width / 2, cy - bar_height / 2, bar_width * fraction, bar_height, arcade.color.YELLOW,
+            )
+
     def on_update(self, delta_time):
         self.camera.update()
         self.stats_panel.on_update(delta_time)
         self.inspector_panel.on_update(delta_time)
+
+        if not self.world.population_complete:
+            return  # still spawning in the background - nothing to tick yet
 
         if self.pending_steps > 0:
             # Forced steps (see step()) run even while paused, and ignore
@@ -137,7 +174,8 @@ class View(arcade.View):
             return
 
         if key == arcade.key.S and modifiers & arcade.key.MOD_CTRL:
-            save_world(self.world)
+            if self.world.population_complete:  # else: still being spawned on a background thread, unsafe to read
+                save_world(self.world)
             return
 
         if key == arcade.key.L and modifiers & arcade.key.MOD_CTRL:
@@ -164,6 +202,7 @@ class View(arcade.View):
         fresh world from it - a reset, not a resume, unlike Ctrl+L."""
         self.world.config.load()
         self.world = World(self.world.config)
+        self.world.populate_async()
         self._on_world_replaced()
 
     # -- file menu / dialogs hooks -------------------------------------------
@@ -173,10 +212,12 @@ class View(arcade.View):
 
     def _create_new_world(self, config):
         self.world = World(config)
+        self.world.populate_async()
         self._on_world_replaced()
 
     def _save_world(self):
-        save_world(self.world)
+        if self.world.population_complete:  # else: still being spawned on a background thread, unsafe to read
+            save_world(self.world)
 
     def _load_world_from_path(self, path):
         self.world = load_world(Path(path))
@@ -185,11 +226,25 @@ class View(arcade.View):
     def _on_world_replaced(self):
         self.stats_panel.world = self.world
         self.inspector_panel.select(None)  # selection belonged to the old world
+        self._center_camera_on_world()
+
+    def _center_camera_on_world(self):
+        """The window is a fixed size, independent of the grid's - a new
+        world's default camera position (the window's own center, see
+        arcade.Camera2D) would otherwise land wherever that happens to
+        fall on the new grid, which is the actual world center only by
+        coincidence. Aim at the real center instead."""
+        self.camera.position = (
+            self.world.grid.width * CELL_PIXELS / 2,
+            self.world.grid.height * CELL_PIXELS / 2,
+        )
 
     def _open_save_as_dialog(self):
         self.save_as_dialog.open(default_name=self.world.config.get("name"))
 
     def _save_world_as(self, directory, name):
+        if not self.world.population_complete:  # still being spawned on a background thread, unsafe to read
+            return
         target = Path(directory) / f"{sanitize_filename(name)}.json"
         save_world(self.world, target)
 
@@ -211,6 +266,9 @@ class View(arcade.View):
         contains the click or it doesn't. Right-click rather than left
         (see ui.camera.Camera.on_mouse_drag) so selecting never fights
         with dragging the map."""
+        if not self.world.population_complete:
+            return  # still being spawned on a background thread, unsafe to read - and nothing's drawn to click yet anyway
+
         world_point = self.camera.unproject((screen_x, screen_y))
         col = int(world_point.x // CELL_PIXELS)
         row = int(world_point.y // CELL_PIXELS)

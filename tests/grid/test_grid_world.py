@@ -20,24 +20,45 @@ def _genome(color=(0, 0, 0), max_energy=100.0, energy_drain_rate=2.0) -> Genome:
 
 def test_spawns_the_requested_amount_of_food(tmp_path):
     world = World(make_config(tmp_path, width=10, height=10, food_count=15, organism_count=0))
+    world.populate()
     assert len(world.grid) == 15
 
 
 def test_food_positions_are_all_unique(tmp_path):
     world = World(make_config(tmp_path, width=10, height=10, food_count=15, organism_count=0))
+    world.populate()
     positions = [food.position for food in world.grid]
     assert len(set(positions)) == len(positions)
 
 
+def test_no_upper_bound_on_grid_size_or_population(tmp_path):
+    """There's deliberately no MAX_WIDTH/HEIGHT/FOOD_COUNT/ORGANISM_COUNT
+    any more - a big grid costs nothing extra (Grid only stores occupied
+    cells), and populate() stops on its own once there's genuinely no
+    room left (see test_never_spawns_more_food_than_cells_exist) rather
+    than needing an artificial cap. A huge request just means a bigger
+    (but still exactly as full as asked) world."""
+    world = World(make_config(tmp_path, width=3000, height=3000, food_count=5000, organism_count=5000))
+    world.populate()
+
+    assert world.grid.width == 3000
+    assert world.grid.height == 3000
+    assert len(world.organisms) == 5000
+    assert len(world.grid) == 10000
+
+
 def test_never_spawns_more_food_than_cells_exist(tmp_path):
     """Regression target: asking for more food than the grid has room for
-    must not hang forever looking for a free cell."""
+    must not hang forever looking for a free cell - populate() just stops
+    once _random_free_cell() reports there's nowhere left to put one."""
     world = World(make_config(tmp_path, width=3, height=3, food_count=100, organism_count=0))
+    world.populate()
     assert len(world.grid) == 9
 
 
 def test_spawns_the_requested_amount_of_organisms(tmp_path):
     world = World(make_config(tmp_path, width=10, height=10, food_count=0, organism_count=12))
+    world.populate()
     assert len(world.organisms) == 12
     assert all(isinstance(o, Organism) for o in world.organisms)
     assert len(world.grid) == 12
@@ -45,9 +66,32 @@ def test_spawns_the_requested_amount_of_organisms(tmp_path):
 
 def test_food_and_organisms_never_share_a_cell(tmp_path):
     world = World(make_config(tmp_path, width=10, height=10, food_count=30, organism_count=30))
+    world.populate()
     positions = [entity.position for entity in world.grid]
     assert len(set(positions)) == len(positions)
     assert len(world.grid) == 60
+
+
+def test_populate_marks_itself_complete(tmp_path):
+    world = World(make_config(tmp_path, width=10, height=10, food_count=5, organism_count=5))
+    assert world.population_complete is True  # nothing populating yet, not "done" as such - but truthy either way
+
+    world.populate()
+
+    assert world.population_complete is True
+    assert world.population_done == world.population_total == 10
+
+
+def test_populate_async_runs_on_a_background_thread_and_completes(tmp_path):
+    world = World(make_config(tmp_path, width=20, height=20, food_count=20, organism_count=10))
+
+    world.populate_async()
+    assert world._population_thread is not None
+    world._population_thread.join(timeout=5)
+
+    assert world.population_complete is True
+    assert len(world.organisms) == 10
+    assert len(world.grid) == 30
 
 
 def test_update_moves_at_least_one_organism_over_many_ticks(tmp_path):
@@ -58,6 +102,7 @@ def test_update_moves_at_least_one_organism_over_many_ticks(tmp_path):
     see Genome.random()'s worst case) so the population is still fully
     alive to compare positions against."""
     world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=5))
+    world.populate()
     starting_positions = [o.position for o in world.organisms]
 
     for _ in range(15):
@@ -69,6 +114,7 @@ def test_update_moves_at_least_one_organism_over_many_ticks(tmp_path):
 
 def test_update_never_lets_two_organisms_collide(tmp_path):
     world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=15))
+    world.populate()
 
     for _ in range(15):
         world.update()

@@ -16,6 +16,7 @@ def make_config(tmp_path, **overrides):
 
 def test_round_trip_preserves_tick_count_and_grid_size(tmp_path):
     world = World(make_config(tmp_path, width=8, height=6, food_count=5, organism_count=3))
+    world.populate()
     for _ in range(7):
         world.update()
 
@@ -28,6 +29,7 @@ def test_round_trip_preserves_tick_count_and_grid_size(tmp_path):
 
 def test_round_trip_preserves_every_entitys_position_and_kind(tmp_path):
     world = World(make_config(tmp_path, width=10, height=10, food_count=8, organism_count=4))
+    world.populate()
 
     loaded = world_from_dict(world_to_dict(world))
 
@@ -60,6 +62,7 @@ def test_round_trip_preserves_matter_composition():
 
 def test_save_and_load_round_trip_through_a_real_file(tmp_path):
     world = World(make_config(tmp_path, width=6, height=6, food_count=4, organism_count=2))
+    world.populate()
     save_path = tmp_path / "save.json"
 
     save_world(world, save_path)
@@ -76,6 +79,7 @@ def test_loaded_world_does_not_spawn_extra_entities(tmp_path):
     """Regression target: loading must reconstruct exactly what was saved,
     not the saved state PLUS a fresh default spawn on top of it."""
     world = World(make_config(tmp_path, width=10, height=10, food_count=6, organism_count=3))
+    world.populate()
     original_count = len(world.grid)
 
     loaded = world_from_dict(world_to_dict(world))
@@ -85,6 +89,7 @@ def test_loaded_world_does_not_spawn_extra_entities(tmp_path):
 
 def test_round_trip_preserves_energy_and_lifetime_counters(tmp_path):
     world = World(make_config(tmp_path, width=10, height=10, food_count=10, organism_count=4))
+    world.populate()
     for _ in range(5):
         world.update()
 
@@ -134,6 +139,7 @@ def test_loaded_world_can_keep_ticking(tmp_path):
     fully functional World (organisms keep moving, no double-registration
     bugs from being reconstructed instead of freshly built)."""
     world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=6))
+    world.populate()
     loaded = world_from_dict(world_to_dict(world))
     starting_positions = [o.position for o in loaded.organisms]
 

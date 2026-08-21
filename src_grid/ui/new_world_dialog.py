@@ -19,18 +19,6 @@ class NewWorldDialog:
     ROW_HEIGHT = 28
     FIELD_WIDTH = 100
 
-    # Every organism gets its own random matter layout (a unique render
-    # texture signature - see ui.renderer), and the arcade texture atlas
-    # has a hard cap of its own (8192 slots, and a max single-texture
-    # dimension) - an unbounded width/height/organism_count here isn't
-    # just a slow world, it's an instant "Unable to create texture" crash
-    # on the very first render. These keep total requested entities well
-    # under that ceiling regardless of what someone types in.
-    MAX_WIDTH = 200
-    MAX_HEIGHT = 200
-    MAX_FOOD_COUNT = 2000
-    MAX_ORGANISM_COUNT = 2000
-
     def __init__(self, on_confirm):
         self.on_confirm = on_confirm
 
@@ -150,12 +138,6 @@ class NewWorldDialog:
             return None
 
         if width <= 0 or height <= 0 or food_count < 0 or organism_count < 0:
-            return None
-
-        if width > self.MAX_WIDTH or height > self.MAX_HEIGHT:
-            return None
-
-        if food_count > self.MAX_FOOD_COUNT or organism_count > self.MAX_ORGANISM_COUNT:
             return None
 
         config = WorldConfig()
