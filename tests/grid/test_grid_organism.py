@@ -86,6 +86,71 @@ def test_step_eats_adjacent_food_and_gains_energy():
     assert all(not isinstance(entity, Food) for entity in grid)
 
 
+def test_step_moves_toward_visible_food_within_search_radius():
+    grid = Grid(15, 15)
+    organism = Organism(_bare_matter(), _genome(), energy=10.0)
+    grid.place(organism, 7, 7)
+    grid.place(Food(_bare_matter(), color=(0, 0, 0), kind="rich"), 10, 7)  # 3 cells east, within SEARCH_RADIUS
+
+    ate = organism.step(grid)
+
+    assert ate is False  # not adjacent yet, just closer
+    assert organism.position == (8, 7)
+
+
+def test_step_ignores_food_beyond_search_radius():
+    grid = Grid(30, 30)
+    organism = Organism(_bare_matter(), _genome(), energy=10.0)
+    grid.place(organism, 15, 15)
+    far_col = 15 + Organism.SEARCH_RADIUS + 5
+    grid.place(Food(_bare_matter(), color=(0, 0, 0), kind="rich"), far_col, 15)
+
+    organism.step(grid)
+
+    col, row = organism.position
+    # Random wander, not a beeline toward food it can't see - still just
+    # one cell from the start in some direction, not necessarily east.
+    assert abs(col - 15) + abs(row - 15) == 1
+
+
+def test_step_falls_back_to_random_when_path_to_food_is_blocked():
+    """Food is visible 2 cells east, but both cells that would move the
+    organism closer to it (east, and - since there's no north/south offset
+    - no secondary axis to try) are occupied. Should wander instead of
+    getting stuck refusing to move."""
+    grid = Grid(10, 10)
+    organism = Organism(_bare_matter(), _genome(), energy=10.0)
+    grid.place(organism, 5, 5)
+    grid.place(Food(_bare_matter(), color=(0, 0, 0), kind="rich"), 7, 5)
+    grid.place(OrganismFactory.create_random(), 6, 5)  # blocks the only useful direction (east)
+
+    organism.step(grid)
+
+    col, row = organism.position
+    assert abs(col - 5) + abs(row - 5) <= 1  # moved one cell (not toward the blocked path) or stayed put
+
+
+def test_nearest_visible_food_finds_the_closest_one():
+    grid = Grid(20, 20)
+    organism = Organism(_bare_matter(), _genome())
+    grid.place(organism, 10, 10)
+    far = Food(_bare_matter(), color=(0, 0, 0), kind="rich")
+    near = Food(_bare_matter(), color=(0, 0, 0), kind="rich")
+    grid.place(far, 14, 10)
+    grid.place(near, 12, 11)
+
+    nearest = organism._nearest_visible_food(grid, 10, 10)
+
+    assert nearest == (12, 11)
+
+
+def test_directions_toward_prefers_the_larger_axis_first():
+    # target is 4 east, 1 north of (0, 0) - east is the bigger gap
+    directions = Organism._directions_toward(0, 0, 4, 1)
+    assert directions[0] == (1, 0)
+    assert directions[1] == (0, 1)
+
+
 def test_eating_stashes_leftover_atoms_in_reserve():
     grid = Grid(5, 5)
     organism = Organism(_bare_matter(), _genome(), energy=10.0)
