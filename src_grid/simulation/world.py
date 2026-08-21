@@ -1,5 +1,6 @@
 import random
 
+from src_grid.core.world_config import WorldConfig
 from src_grid.simulation.grid import Grid
 from src_grid.core.food_factory import FoodFactory
 from src_grid.core.organism_factory import OrganismFactory
@@ -12,14 +13,21 @@ class World:
     movement rules (AI, eating, genetics) come once this much is proven
     out."""
 
-    def __init__(self, width: int = 40, height: int = 30, food_count: int = 80, organism_count: int = 20):
+    def __init__(self, config: WorldConfig = None):
+        self.config = config or WorldConfig()
+
+        width = self.config.get("width")
+        height = self.config.get("height")
+
         self.grid = Grid(width, height)
         self.organisms = []
         self.tick_count = 0
 
+        food_count = self.config.get("food_count")
         for _ in range(min(food_count, width * height)):
             self._spawn_food()
 
+        organism_count = self.config.get("organism_count")
         for _ in range(min(organism_count, width * height - len(self.grid))):
             self._spawn_organism()
 

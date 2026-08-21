@@ -1,13 +1,19 @@
 import math
+from pathlib import Path
 
 import arcade
 
 from ui.camera import Camera
+from ui.save_as_dialog import SaveAsDialog
 
 from src_grid.simulation.world import World
+from src_grid.core.world_config import sanitize_filename
+from src_grid.core.world_save import save_world, load_world, GRID_SAVES_DIR
 from src_grid.ui.renderer import Renderer, CELL_PIXELS
 from src_grid.ui.control_panel import ControlPanel
 from src_grid.ui.stats_panel import StatsPanel
+from src_grid.ui.file_menu import FileMenu
+from src_grid.ui.new_world_dialog import NewWorldDialog
 
 
 class View(arcade.View):
@@ -39,6 +45,17 @@ class View(arcade.View):
         self.control_panel = ControlPanel(self)
         self.stats_panel = StatsPanel(world)
 
+        self.file_menu = FileMenu(
+            on_new_world=self._open_new_world_dialog,
+            on_save=self._save_world,
+            on_load=self._load_world_from_path,
+            on_save_as=self._open_save_as_dialog,
+        )
+        self.new_world_dialog = NewWorldDialog(on_confirm=self._create_new_world)
+
+        default_dir = GRID_SAVES_DIR if GRID_SAVES_DIR.exists() else None
+        self.save_as_dialog = SaveAsDialog(on_confirm=self._save_world_as, default_directory=default_dir)
+
     def on_show_view(self):
         # arcade.gui.UIManager.enable() must be called from on_show_view(),
         # not the constructor - it registers handlers on the window via
@@ -47,10 +64,16 @@ class View(arcade.View):
         # through to the camera pan instead (the "slider drags the map" bug).
         self.control_panel.enable()
         self.stats_panel.enable()
+        self.file_menu.enable()
+        self.new_world_dialog.enable()
+        self.save_as_dialog.enable()
 
     def on_hide_view(self):
         self.control_panel.disable()
         self.stats_panel.disable()
+        self.file_menu.disable()
+        self.new_world_dialog.disable()
+        self.save_as_dialog.disable()
 
     def on_draw(self):
         self.clear()
@@ -64,6 +87,9 @@ class View(arcade.View):
         self.window.default_camera.use()
         self.control_panel.draw()
         self.stats_panel.draw()
+        self.file_menu.draw()
+        self.new_world_dialog.draw()
+        self.save_as_dialog.draw()
 
     def on_update(self, delta_time):
         self.camera.update()
@@ -104,7 +130,46 @@ class View(arcade.View):
             self.renderer.show_grid = not self.renderer.show_grid
             return
 
+        if key == arcade.key.S and modifiers & arcade.key.MOD_CTRL:
+            save_world(self.world)
+            return
+
+        if key == arcade.key.L and modifiers & arcade.key.MOD_CTRL:
+            self._load_saved_world()
+            return
+
         self.camera.on_key_press(key, modifiers)
+
+    def _load_saved_world(self):
+        try:
+            self.world = load_world()
+        except FileNotFoundError:
+            return
+
+        self.stats_panel.world = self.world
+
+    # -- file menu / dialogs hooks -------------------------------------------
+
+    def _open_new_world_dialog(self):
+        self.new_world_dialog.open()
+
+    def _create_new_world(self, config):
+        self.world = World(config)
+        self.stats_panel.world = self.world
+
+    def _save_world(self):
+        save_world(self.world)
+
+    def _load_world_from_path(self, path):
+        self.world = load_world(Path(path))
+        self.stats_panel.world = self.world
+
+    def _open_save_as_dialog(self):
+        self.save_as_dialog.open(default_name=self.world.config.get("name"))
+
+    def _save_world_as(self, directory, name):
+        target = Path(directory) / f"{sanitize_filename(name)}.json"
+        save_world(self.world, target)
 
     def on_key_release(self, key, modifiers):
         self.camera.on_key_release(key, modifiers)

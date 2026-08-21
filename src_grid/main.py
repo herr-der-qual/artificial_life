@@ -13,18 +13,17 @@ for _path in (_REPO_ROOT, _REPO_ROOT / "src"):
 
 import arcade
 
+from src_grid.core.world_config import WorldConfig
 from src_grid.simulation.world import World
 from src_grid.ui.view import View
 from src_grid.ui.renderer import CELL_PIXELS
 
-GRID_WIDTH = 40
-GRID_HEIGHT = 30
-
 
 def main():
-    world = World(width=GRID_WIDTH, height=GRID_HEIGHT, food_count=80, organism_count=20)
+    config = WorldConfig()
+    world = World(config)
 
-    window = arcade.Window(GRID_WIDTH * CELL_PIXELS, GRID_HEIGHT * CELL_PIXELS, "Grid Field")
+    window = arcade.Window(config.get("width") * CELL_PIXELS, config.get("height") * CELL_PIXELS, "Grid Field")
     arcade.set_background_color(arcade.color.BLACK)
     window.show_view(View(world))
     arcade.run()

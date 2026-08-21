@@ -1,44 +1,51 @@
+from src_grid.core.world_config import WorldConfig
 from src_grid.simulation.world import World
 from src_grid.simulation.organism import Organism
 
 
-def test_spawns_the_requested_amount_of_food():
-    world = World(width=10, height=10, food_count=15, organism_count=0)
+def make_config(tmp_path, **overrides):
+    config = WorldConfig(path=tmp_path / "grid_world_config.json")
+    config.data.update(overrides)
+    return config
+
+
+def test_spawns_the_requested_amount_of_food(tmp_path):
+    world = World(make_config(tmp_path, width=10, height=10, food_count=15, organism_count=0))
     assert len(world.grid) == 15
 
 
-def test_food_positions_are_all_unique():
-    world = World(width=10, height=10, food_count=15, organism_count=0)
+def test_food_positions_are_all_unique(tmp_path):
+    world = World(make_config(tmp_path, width=10, height=10, food_count=15, organism_count=0))
     positions = [food.position for food in world.grid]
     assert len(set(positions)) == len(positions)
 
 
-def test_never_spawns_more_food_than_cells_exist():
+def test_never_spawns_more_food_than_cells_exist(tmp_path):
     """Regression target: asking for more food than the grid has room for
     must not hang forever looking for a free cell."""
-    world = World(width=3, height=3, food_count=100, organism_count=0)
+    world = World(make_config(tmp_path, width=3, height=3, food_count=100, organism_count=0))
     assert len(world.grid) == 9
 
 
-def test_spawns_the_requested_amount_of_organisms():
-    world = World(width=10, height=10, food_count=0, organism_count=12)
+def test_spawns_the_requested_amount_of_organisms(tmp_path):
+    world = World(make_config(tmp_path, width=10, height=10, food_count=0, organism_count=12))
     assert len(world.organisms) == 12
     assert all(isinstance(o, Organism) for o in world.organisms)
     assert len(world.grid) == 12
 
 
-def test_food_and_organisms_never_share_a_cell():
-    world = World(width=10, height=10, food_count=30, organism_count=30)
+def test_food_and_organisms_never_share_a_cell(tmp_path):
+    world = World(make_config(tmp_path, width=10, height=10, food_count=30, organism_count=30))
     positions = [entity.position for entity in world.grid]
     assert len(set(positions)) == len(positions)
     assert len(world.grid) == 60
 
 
-def test_update_moves_at_least_one_organism_over_many_ticks():
+def test_update_moves_at_least_one_organism_over_many_ticks(tmp_path):
     """A single tick can be a no-op (blocked move, or the unlucky random
     direction picks off the edge) - across many ticks, on an otherwise
     empty field, organisms should clearly have moved somewhere."""
-    world = World(width=20, height=20, food_count=0, organism_count=5)
+    world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=5))
     starting_positions = [o.position for o in world.organisms]
 
     for _ in range(50):
@@ -48,8 +55,8 @@ def test_update_moves_at_least_one_organism_over_many_ticks():
     assert ending_positions != starting_positions
 
 
-def test_update_never_lets_two_organisms_collide():
-    world = World(width=20, height=20, food_count=0, organism_count=15)
+def test_update_never_lets_two_organisms_collide(tmp_path):
+    world = World(make_config(tmp_path, width=20, height=20, food_count=0, organism_count=15))
 
     for _ in range(50):
         world.update()
@@ -57,8 +64,8 @@ def test_update_never_lets_two_organisms_collide():
         assert len(set(positions)) == len(positions)
 
 
-def test_tick_count_starts_at_zero_and_increments_on_update():
-    world = World(width=10, height=10, food_count=0, organism_count=1)
+def test_tick_count_starts_at_zero_and_increments_on_update(tmp_path):
+    world = World(make_config(tmp_path, width=10, height=10, food_count=0, organism_count=1))
     assert world.tick_count == 0
 
     world.update()
