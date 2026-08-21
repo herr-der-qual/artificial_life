@@ -1,24 +1,96 @@
 import random
 
 from simulation.matter import Matter
+from simulation.reactor import Reactor
+
+from src_grid.simulation.food import Food
 
 
 class Organism:
-    """A movable entity on the Grid - deliberately minimal for now, no
-    genetics/diet/energy yet (see the pymunk-based Organism for where
-    those eventually come from once this model is proven out). Just
-    enough to prove movement works on a discrete field."""
+    """A movable, energy-driven entity on the Grid. No diet/brain yet (see
+    the pymunk-based Organism for where those eventually come from once
+    this model is proven out) - just enough to prove a real
+    energy/eating/death/reproduction loop works on a discrete field.
 
-    def __init__(self, matter: Matter, color):
+    Movement doubles as foraging: each tick the organism checks its four
+    neighboring cells for food first and moves onto it (eating it) if
+    there is any, falling back to a random free direction otherwise -
+    there's no brain/search radius yet, so "seeking" food only reaches as
+    far as the organism can already see from where it's standing."""
+
+    MAX_ENERGY = 100.0
+    ENERGY_DRAIN_PER_TICK = 2.0
+
+    # Calibrated in grid ticks (this world has no delta_time), not the
+    # pymunk system's seconds - REPRODUCE_MATTER_THRESHOLD is kept the
+    # same, though, since it's measured in atomic mass from the same
+    # shared chemistry (MoleculeFactory/Reactor), not simulation time.
+    REPRODUCE_ENERGY_COST = 30.0
+    REPRODUCE_ENERGY_SAFETY_MARGIN = 1.5
+    REPRODUCE_MATTER_THRESHOLD = 25.0
+    REPRODUCE_COOLDOWN = 10  # ticks
+
+    _DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+    def __init__(self, matter: Matter, color, energy: float = None, generation: int = 0):
         self.matter = matter
         self.color = color
         self.position = (0, 0)  # (col, row) - set for real by Grid.place
+        self.energy = self.MAX_ENERGY if energy is None else energy
+        self.is_alive = True
+        self.generation = generation
 
-    def step(self, grid):
-        """Random-walk one cell in one of the 4 cardinal directions. A
-        blocked move (something already there, or off the edge) is just a
-        no-op this tick, not an error - Grid.move() already guarantees
-        two things never share a cell."""
+        # Leftover atoms from digested food, not yet spent - the
+        # biological "cost" reproduction draws from (see can_reproduce).
+        self.reserve = Matter()
+        self.reproduction_cooldown = 0
+
+    def step(self, grid) -> bool:
+        """Drain energy and die of starvation if it runs out; otherwise
+        move one cell - onto adjacent food if there is any (eating it), or
+        a random free direction otherwise. Returns whether it ate."""
+        self.energy -= self.ENERGY_DRAIN_PER_TICK
+        self.reproduction_cooldown = max(0, self.reproduction_cooldown - 1)
+        if self.energy <= 0:
+            self.is_alive = False
+            return False
+
         col, row = self.position
-        dc, dr = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
+        directions = list(self._DIRECTIONS)
+        random.shuffle(directions)
+
+        food, target = None, None
+        for dc, dr in directions:
+            candidate = (col + dc, row + dr)
+            occupant = grid.occupant_at(*candidate)
+            if isinstance(occupant, Food):
+                food, target = occupant, candidate
+                break
+
+        if food is not None:
+            grid.remove(food)
+            grid.move(self, *target)
+            self._eat(food)
+            return True
+
+        dc, dr = directions[0]
         grid.move(self, col + dc, row + dr)
+        return False
+
+    def _eat(self, food: Food):
+        """Digest via the same catalyzed reaction the pymunk system uses:
+        net energy goes straight to self.energy, and the leftover atoms
+        (the reaction's products) are stashed in reserve to fund a future
+        reproduction (see can_reproduce)."""
+        result = Reactor.react(food.matter.molecules, catalyzed=True)
+        self.energy = min(self.MAX_ENERGY, self.energy + result.energy_delta)
+        for product in result.products:
+            self.reserve.add_molecule(product)
+
+    def can_reproduce(self) -> bool:
+        return (
+            self.is_alive
+            and self.reproduction_cooldown <= 0
+            and self.energy >= self.REPRODUCE_ENERGY_COST * self.REPRODUCE_ENERGY_SAFETY_MARGIN
+            and self.reserve.mass >= self.REPRODUCE_MATTER_THRESHOLD
+        )

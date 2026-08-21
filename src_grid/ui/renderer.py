@@ -25,6 +25,21 @@ def _blend(element_color, item_color) -> tuple:
     )
 
 
+def _texture_signature(food):
+    """Two entities with identical atom layout and color render pixel-for-
+    pixel identical textures - most food is one of a handful of fixed
+    recipes (see FoodFactory), so this collapses many entities down to a
+    handful of cached textures. Organisms, though, each get a random
+    matter layout of their own, so their signatures are normally unique -
+    see _TextureCache for why that still has to be reference-counted, not
+    just cached forever."""
+    positions = atom_positions(food.matter.molecules)
+    return (
+        tuple((round(x, 4), round(y, 4), element) for x, y, element in positions),
+        tuple(food.color),
+    )
+
+
 def _build_food_texture(food) -> arcade.Texture:
     """One circle per atom (see simulation.body_geometry.atom_positions),
     colored by element and blended with the food's own color - same idea
@@ -51,6 +66,44 @@ def _build_food_texture(food) -> arcade.Texture:
     return arcade.Texture(image)
 
 
+class _TextureCache:
+    """Reference-counted texture cache - see ui.renderer._TextureCache for
+    the full reasoning (same class, ported here): arcade's texture atlas
+    has a hard cap (8192 slots) and only reclaims a slot once every Python
+    reference to the Texture is gone. Content is shared across most food
+    (a handful of fixed recipes), but organisms each get a random matter
+    layout of their own, so without dropping our own reference once the
+    last entity using a signature is gone, textures for long-dead
+    organisms - or entire previous worlds, after New World/Load swaps the
+    population out from under a Renderer that outlives them - pile up
+    forever and eventually overflow the atlas."""
+
+    def __init__(self, build, signature):
+        self._build = build
+        self._signature = signature
+        self._textures = {}
+        self._refcounts = {}
+
+    def acquire(self, item):
+        signature = self._signature(item)
+        texture = self._textures.get(signature)
+        if texture is None:
+            texture = self._build(item)
+            self._textures[signature] = texture
+            self._refcounts[signature] = 0
+        self._refcounts[signature] += 1
+        return signature, texture
+
+    def release(self, signature):
+        self._refcounts[signature] -= 1
+        if self._refcounts[signature] <= 0:
+            del self._refcounts[signature]
+            del self._textures[signature]
+
+    def __len__(self):
+        return len(self._textures)
+
+
 class Renderer:
     """Draws a Grid's occupants as sprites in a persistent SpriteList -
     same reasoning as ui.renderer.Renderer (rebuilding shapes every frame
@@ -62,22 +115,11 @@ class Renderer:
     def __init__(self):
         self.sprite_list = arcade.SpriteList()
         self._sprites_by_id = {}
-        self._textures = {}
+        self._sprite_signatures = {}
+        self._body_cache = _TextureCache(_build_food_texture, _texture_signature)
 
         self.show_grid = False
         self._grid_line_cache = None  # ((width, height), point_list) - rebuilt only if the grid size changes
-
-    def _texture_for(self, food) -> arcade.Texture:
-        positions = atom_positions(food.matter.molecules)
-        signature = (
-            tuple((round(x, 4), round(y, 4), element) for x, y, element in positions),
-            tuple(food.color),
-        )
-        texture = self._textures.get(signature)
-        if texture is None:
-            texture = _build_food_texture(food)
-            self._textures[signature] = texture
-        return texture
 
     def render(self, grid):
         seen_ids = set()
@@ -88,10 +130,12 @@ class Renderer:
 
             sprite = self._sprites_by_id.get(key)
             if sprite is None:
-                sprite = arcade.Sprite(self._texture_for(entity))
+                signature, texture = self._body_cache.acquire(entity)
+                sprite = arcade.Sprite(texture)
                 sprite.width = CELL_PIXELS
                 sprite.height = CELL_PIXELS
                 self._sprites_by_id[key] = sprite
+                self._sprite_signatures[key] = signature
                 self.sprite_list.append(sprite)
 
             col, row = entity.position
@@ -99,7 +143,9 @@ class Renderer:
 
         stale_ids = self._sprites_by_id.keys() - seen_ids
         for key in stale_ids:
-            self.sprite_list.remove(self._sprites_by_id.pop(key))
+            sprite = self._sprites_by_id.pop(key)
+            self.sprite_list.remove(sprite)
+            self._body_cache.release(self._sprite_signatures.pop(key))
 
         self.sprite_list.draw()
 

@@ -57,6 +57,10 @@ def world_to_dict(world: World) -> dict:
             "matter": _serialize_matter(entity.matter),
         }
         if id(entity) in organism_ids:
+            entry["energy"] = entity.energy
+            entry["generation"] = entity.generation
+            entry["reproduction_cooldown"] = entity.reproduction_cooldown
+            entry["reserve"] = _serialize_matter(entity.reserve)
             organism_entries.append(entry)
         else:
             entry["kind"] = entity.kind
@@ -64,6 +68,10 @@ def world_to_dict(world: World) -> dict:
 
     return {
         "tick_count": world.tick_count,
+        "deaths_count": world.deaths_count,
+        "food_eaten_count": world.food_eaten_count,
+        "births_count": world.births_count,
+        "max_generation_reached": world.max_generation_reached,
         "grid": {"width": world.grid.width, "height": world.grid.height},
         "food": food_entries,
         "organisms": organism_entries,
@@ -81,13 +89,23 @@ def world_from_dict(data: dict) -> World:
 
     world = World(config)
     world.tick_count = data["tick_count"]
+    world.deaths_count = data.get("deaths_count", 0)
+    world.food_eaten_count = data.get("food_eaten_count", 0)
+    world.births_count = data.get("births_count", 0)
+    world.max_generation_reached = data.get("max_generation_reached", 0)
 
     for entry in data["food"]:
         food = Food(_deserialize_matter(entry["matter"]), tuple(entry["color"]), entry["kind"])
         world.grid.place(food, entry["col"], entry["row"])
 
     for entry in data["organisms"]:
-        organism = Organism(_deserialize_matter(entry["matter"]), tuple(entry["color"]))
+        organism = Organism(
+            _deserialize_matter(entry["matter"]), tuple(entry["color"]),
+            energy=entry.get("energy"), generation=entry.get("generation", 0),
+        )
+        organism.reproduction_cooldown = entry.get("reproduction_cooldown", 0)
+        if "reserve" in entry:
+            organism.reserve = _deserialize_matter(entry["reserve"])
         world.grid.place(organism, entry["col"], entry["row"])
         world.organisms.append(organism)
 

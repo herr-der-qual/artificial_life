@@ -4,6 +4,7 @@ from simulation.matter import Matter
 from src_grid.core.world_config import WorldConfig
 from src_grid.core.world_save import save_world, load_world, world_to_dict, world_from_dict
 from src_grid.simulation.world import World
+from src_grid.simulation.organism import Organism
 
 
 def make_config(tmp_path, **overrides):
@@ -79,6 +80,47 @@ def test_loaded_world_does_not_spawn_extra_entities(tmp_path):
     loaded = world_from_dict(world_to_dict(world))
 
     assert len(loaded.grid) == original_count
+
+
+def test_round_trip_preserves_energy_and_lifetime_counters(tmp_path):
+    world = World(make_config(tmp_path, width=10, height=10, food_count=10, organism_count=4))
+    for _ in range(5):
+        world.update()
+
+    loaded = world_from_dict(world_to_dict(world))
+
+    original_energy = sorted(o.energy for o in world.organisms)
+    restored_energy = sorted(o.energy for o in loaded.organisms)
+    assert restored_energy == original_energy
+    assert loaded.deaths_count == world.deaths_count
+    assert loaded.food_eaten_count == world.food_eaten_count
+
+
+def test_round_trip_preserves_reproduction_state(tmp_path):
+    world = World(make_config(tmp_path, width=10, height=10, food_count=0, organism_count=0))
+
+    organism = Organism(_matter(), color=(1, 2, 3), energy=42.0, generation=5)
+    organism.reproduction_cooldown = 3
+    organism.reserve.add_molecule(MoleculeFactory.simple_organic())
+    world.grid.place(organism, 4, 4)
+    world.organisms.append(organism)
+    world.births_count = 7
+    world.max_generation_reached = 5
+
+    loaded = world_from_dict(world_to_dict(world))
+
+    assert loaded.births_count == 7
+    assert loaded.max_generation_reached == 5
+    restored = loaded.organisms[0]
+    assert restored.generation == 5
+    assert restored.reproduction_cooldown == 3
+    assert restored.reserve.mass == organism.reserve.mass
+
+
+def _matter() -> Matter:
+    matter = Matter()
+    matter.add_molecule(MoleculeFactory.simple_organic())
+    return matter
 
 
 def test_loaded_world_can_keep_ticking(tmp_path):

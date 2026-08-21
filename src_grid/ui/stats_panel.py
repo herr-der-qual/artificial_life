@@ -4,11 +4,7 @@ import arcade.gui
 
 class StatsPanel:
     """Right-side drawer with live population statistics - mirrors the
-    pymunk world's StatsPanel (same slide-out mechanic, toggle button).
-    Most rows are still stubs ("-") until the grid world actually has the
-    mechanic behind them (energy, reproduction, death, generations) - the
-    layout is built now so wiring in real data later is a one-line change
-    per row, not a redesign."""
+    pymunk world's StatsPanel (same slide-out mechanic, toggle button)."""
 
     WIDTH = 240
     TOP_MARGIN = 15
@@ -40,13 +36,11 @@ class StatsPanel:
         self.alive_label = arcade.gui.UILabel(text="Alive: 0", width=content_width)
         self.food_label = arcade.gui.UILabel(text="Food: 0", width=content_width)
 
-        # No death/reproduction/energy/genetics yet (see World) - these
-        # stay stubbed out until each mechanic actually exists.
-        self.deaths_label = arcade.gui.UILabel(text="Deaths: -", width=content_width)
-        self.births_label = arcade.gui.UILabel(text="Born: -", width=content_width)
-        self.food_eaten_label = arcade.gui.UILabel(text="Food eaten: -", width=content_width)
+        self.deaths_label = arcade.gui.UILabel(text="Deaths: 0", width=content_width)
+        self.food_eaten_label = arcade.gui.UILabel(text="Food eaten: 0", width=content_width)
         self.energy_label = arcade.gui.UILabel(text="Avg energy: -", width=content_width)
-        self.generation_label = arcade.gui.UILabel(text="Max generation: -", width=content_width)
+        self.births_label = arcade.gui.UILabel(text="Born: 0", width=content_width)
+        self.generation_label = arcade.gui.UILabel(text="Max generation: 0", width=content_width)
 
         for label in (
             self.tick_label, self.alive_label, self.food_label,
@@ -123,7 +117,13 @@ class StatsPanel:
     def _refresh_stats(self):
         alive = len(self.world.organisms)
         food = len(self.world.grid) - alive
+        avg_energy = sum(o.energy for o in self.world.organisms) / alive if alive else 0.0
 
         self.tick_label.text = f"Tick: {self.world.tick_count}"
         self.alive_label.text = f"Alive: {alive}"
         self.food_label.text = f"Food: {food}"
+        self.deaths_label.text = f"Deaths: {self.world.deaths_count}"
+        self.food_eaten_label.text = f"Food eaten: {self.world.food_eaten_count}"
+        self.energy_label.text = f"Avg energy: {avg_energy:.1f}"
+        self.births_label.text = f"Born: {self.world.births_count}"
+        self.generation_label.text = f"Max generation: {self.world.max_generation_reached}"
